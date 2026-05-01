@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Amoura — Virtual Photobooth for Moments Together",
+  title: "Amoura — Virtual Photobooth",
   description:
     "Amoura is a premium virtual photobooth made for couples, friends, solo portraits, and long-distance memories. Capture beautiful photostrips together, even when apart.",
   applicationName: "Amoura",
@@ -23,6 +23,8 @@ export const metadata: Metadata = {
     "couple photobooth",
     "long distance couple app",
     "photo strip maker",
+    "amoura photobooth",
+    "ldr photobooth",
     "mobile photobooth",
     "Amoura",
   ],

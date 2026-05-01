@@ -1,0 +1,1 @@
+---This is the official database schema of Amoura - Virtual Photobooth
