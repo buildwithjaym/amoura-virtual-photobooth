@@ -157,8 +157,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const nextPhotoLabel = useMemo(() => {
     if (!room) return "Start Photo 1"
 
-    if (room.status === "countdown") return "Countdown running..."
-    if (room.status === "capturing") return "Capturing..."
+    if (room.status === "countdown") return "Countdown in progress"
+    if (room.status === "capturing") return "Capturing photo"
     if (isResultReady) return "Continue to Strip Design"
 
     if (hostPhotos.length === 0 && partnerPhotos.length === 0) {
@@ -177,20 +177,20 @@ export default function DualCaptureClient({ roomCode }: Props) {
   }, [room, hostPhotos.length, partnerPhotos.length, isResultReady])
 
   const stageTitle = useMemo(() => {
-    if (!room) return "Preparing room"
+    if (!room) return "Preparing your room"
 
     if (!partnerOnline) return "Waiting for partner"
     if (!cameraReady) return "Allow your camera"
     if (!liveConnected) return "Connecting cameras"
 
-    if (isResultReady) return "Photos are ready"
+    if (isResultReady) return "Your photos are ready"
 
     if (room.status === "between_shots" && room.current_shot === 1) {
-      return "Photo 1 captured"
+      return "Photo 1 saved"
     }
 
     if (room.status === "between_shots" && room.current_shot === 2) {
-      return "Photo 2 captured"
+      return "Photo 2 saved"
     }
 
     if (room.current_shot === 1) return "Photo 1 of 3"
@@ -210,23 +210,23 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
 
     if (!liveConnected) {
-      return "Stay here while both cameras connect. You can still prepare your pose."
+      return "Stay here while both cameras connect. You can already prepare your pose."
     }
 
     if (isResultReady) {
-      return "Continue to the strip editor to choose your theme, filter, and caption."
+      return "Choose your theme, filter, and caption in the strip editor."
     }
 
     if (room?.status === "between_shots" && room.current_shot === 1) {
-      return "Change your pose before photo 2. Heart hands are perfect here."
+      return "Nice shot. Change your pose before photo 2."
     }
 
     if (room?.status === "between_shots" && room.current_shot === 2) {
-      return "One last pose. Make the final photo count."
+      return "One last pose. Make the final photo your favorite."
     }
 
     if (room?.current_shot === 1) {
-      return "First pose. Smile and look at the camera."
+      return "First pose. Smile, look at the camera, or make heart hands."
     }
 
     if (room?.current_shot === 2) {
@@ -586,7 +586,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
   function saveResultData(data: DualResultData) {
     sessionStorage.setItem(DUAL_RESULT_KEY, JSON.stringify(data))
     setIsResultReady(true)
-    setCaptureMessage("All photos are ready. Continue to your strip design.")
+    setCaptureMessage("All photos are ready. Continue to the strip editor.")
   }
 
   function handleResultReady(payload: ResultPayload) {
@@ -598,7 +598,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     if (!currentRole || !channelRef.current) return
 
     setCapturingShot(shot)
-    setCaptureMessage("BOOM! Capturing...")
+    setCaptureMessage("Capturing your photo...")
 
     setFlash(true)
     window.setTimeout(() => {
@@ -627,11 +627,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
     })
 
     if (shot === 1) {
-      setCaptureMessage("Photo 1 saved. Prepare for photo 2.")
+      setCaptureMessage("Photo 1 saved. Get ready for photo 2.")
     } else if (shot === 2) {
       setCaptureMessage("Photo 2 saved. One final pose left.")
     } else {
-      setCaptureMessage("All photos captured. Continue to strip design.")
+      setCaptureMessage("All photos captured. Continue to the strip editor.")
     }
 
     window.setTimeout(() => {
@@ -878,7 +878,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
     const tickTwo = window.setTimeout(() => setCountdown(2), 1000)
     const tickOne = window.setTimeout(() => setCountdown(1), 2000)
-    const tickBoom = window.setTimeout(() => setCountdown(0), 3000)
+    const tickCapture = window.setTimeout(() => setCountdown(0), 3000)
 
     const captureTimer = window.setTimeout(() => {
       captureShot(shot).catch(console.error)
@@ -887,7 +887,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     return () => {
       window.clearTimeout(tickTwo)
       window.clearTimeout(tickOne)
-      window.clearTimeout(tickBoom)
+      window.clearTimeout(tickCapture)
       window.clearTimeout(captureTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1043,7 +1043,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
           />
 
           {flash ? (
-            <div className="pointer-events-none absolute inset-0 z-30 bg-white/80" />
+            <div className="pointer-events-none absolute inset-0 z-30 bg-white/45" />
           ) : null}
         </section>
 
@@ -1208,54 +1208,60 @@ function CaptureCenterOverlay({
   const isCounting = countdown !== null
 
   return (
-    <div
-      className={`pointer-events-none absolute left-1/2 top-1/2 z-20 w-[min(92vw,430px)] -translate-x-1/2 -translate-y-1/2 text-center transition ${
-        isCounting ? "scale-100" : "scale-95"
-      }`}
-    >
+    <>
       {isCounting ? (
-        <div className="mx-auto flex h-36 w-36 items-center justify-center rounded-full border border-amoura-red-soft/50 bg-black/75 px-3 text-center text-5xl font-bold leading-none text-amoura-cream shadow-[0_0_90px_rgba(194,31,58,0.5)] backdrop-blur-xl sm:h-48 sm:w-48 sm:text-7xl">
-          {countdown > 0 ? countdown : "BOOM!"}
+        <div className="pointer-events-none absolute left-1/2 top-5 z-20 -translate-x-1/2 sm:top-6">
+          <div className="flex items-center gap-3 rounded-full border border-amoura-red-soft/30 bg-black/45 px-5 py-3 text-amoura-cream shadow-[0_0_40px_rgba(194,31,58,0.25)] backdrop-blur-xl">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amoura-red-soft">
+              {shot ? `Photo ${shot}` : "Get ready"}
+            </span>
+
+            <span className="amoura-serif min-w-12 text-center text-3xl leading-none text-amoura-cream sm:text-4xl">
+              {countdown > 0 ? countdown : "Capture"}
+            </span>
+          </div>
         </div>
       ) : (
-        <div className="rounded-[1.4rem] border border-amoura-red-soft/20 bg-black/45 p-4 shadow-2xl backdrop-blur-xl sm:p-5">
-          <div className="mx-auto mb-2 inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/20 bg-amoura-red/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amoura-red-soft sm:text-xs">
-            <Sparkles className="h-3.5 w-3.5" />
-            {isResultReady
-              ? "Ready"
-              : shot
-                ? `Photo ${shot} of 3`
-                : "Capture stage"}
+        <div className="pointer-events-none absolute inset-x-3 top-5 z-20 mx-auto max-w-md text-center sm:top-6">
+          <div className="rounded-[1.25rem] border border-amoura-red-soft/15 bg-black/35 p-3 shadow-2xl backdrop-blur-xl sm:p-4">
+            <div className="mx-auto mb-2 inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/15 bg-amoura-red/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-amoura-red-soft">
+              <Sparkles className="h-3.5 w-3.5" />
+              {isResultReady
+                ? "Ready"
+                : shot
+                  ? `Photo ${shot} of 3`
+                  : "Capture stage"}
+            </div>
+
+            <h1 className="amoura-serif text-xl leading-none text-amoura-cream sm:text-3xl">
+              {title}
+            </h1>
+
+            <p className="mx-auto mt-1.5 max-w-sm text-[11px] leading-5 text-amoura-muted sm:text-sm sm:leading-6">
+              {subtitle}
+            </p>
+
+            {capturingShot ? (
+              <div className="mt-2 text-xs font-semibold text-amoura-cream sm:text-sm">
+                Capturing photo {capturingShot}...
+              </div>
+            ) : null}
+
+            {message ? (
+              <div className="mt-2 rounded-full border border-amoura-red-soft/15 bg-black/35 px-4 py-2 text-[11px] text-amoura-cream sm:text-sm">
+                {message}
+              </div>
+            ) : null}
+
+            {error ? (
+              <div className="mt-2 rounded-2xl border border-rose-300/15 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">
+                {error}
+              </div>
+            ) : null}
           </div>
-
-          <h1 className="amoura-serif text-2xl leading-none text-amoura-cream sm:text-4xl">
-            {title}
-          </h1>
-
-          <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-amoura-muted sm:text-sm sm:leading-6">
-            {subtitle}
-          </p>
-
-          {capturingShot ? (
-            <div className="mt-3 text-sm font-semibold text-amoura-cream">
-              Capturing photo {capturingShot}...
-            </div>
-          ) : null}
-
-          {message ? (
-            <div className="mt-3 rounded-full border border-amoura-red-soft/20 bg-black/40 px-4 py-2 text-xs text-amoura-cream sm:text-sm">
-              {message}
-            </div>
-          ) : null}
-
-          {error ? (
-            <div className="mt-3 rounded-2xl border border-rose-300/15 bg-rose-500/10 px-4 py-3 text-xs text-rose-200 sm:text-sm">
-              {error}
-            </div>
-          ) : null}
         </div>
       )}
-    </div>
+    </>
   )
 }
 
