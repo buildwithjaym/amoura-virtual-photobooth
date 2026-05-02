@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next"
 
 const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL || "https://www.amoreframephotobooth.site"
+  process.env.NEXT_PUBLIC_SITE_URL || "https://www.amoreframephotobooth.site"
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const currentDate = new Date()
