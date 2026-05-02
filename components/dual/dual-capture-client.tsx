@@ -1,19 +1,27 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react"
 import {
   ArrowLeft,
   Camera,
   Check,
   Heart,
   Loader2,
+  Mic,
   RefreshCcw,
   Sparkles,
   Users,
   VideoOff,
-  Wifi,
-  WifiOff,
+  Volume2,
+  VolumeX,
 } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { getDisplayName } from "@/lib/dual/helpers"
@@ -32,6 +40,11 @@ type SignalPayload = {
   role: DualRoomMemberRole
   sdp?: RTCSessionDescriptionInit
   candidate?: RTCIceCandidateInit
+}
+
+type CameraReadyPayload = {
+  from: string
+  role: DualRoomMemberRole
 }
 
 type PhotoPayload = {
@@ -59,7 +72,7 @@ type DisplaySlot = {
   key: "host" | "partner"
   label: string
   name: string
-  videoRef: React.RefObject<HTMLVideoElement | null>
+  videoRef: RefObject<HTMLVideoElement | null>
   isLocal: boolean
   cameraReady: boolean
   waiting: boolean
@@ -72,12 +85,14 @@ const DUAL_RESULT_KEY = "amoreframe_dual_photos"
 const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME
 const turnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL
 
+const hasTurnServer = Boolean(turnUsername && turnCredential)
+
 const rtcConfig: RTCConfiguration = {
   iceServers: [
     {
       urls: "stun:stun.relay.metered.ca:80",
     },
-    ...(turnUsername && turnCredential
+    ...(hasTurnServer
       ? [
           {
             urls: "turn:global.relay.metered.ca:80",
@@ -123,9 +138,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const makingOfferRef = useRef(false)
   const ignoreOfferRef = useRef(false)
   const lastOfferAtRef = useRef(0)
+  const cameraAutoStartedRef = useRef(false)
 
   const currentUserIdRef = useRef("")
   const currentRoleRef = useRef<DualRoomMemberRole | null>(null)
+  const soundEnabledRef = useRef(false)
 
   const [room, setRoom] = useState<DualRoom | null>(null)
   const [members, setMembers] = useState<DualRoomMember[]>([])
@@ -136,6 +153,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const [cameraReady, setCameraReady] = useState(false)
   const [remoteCameraReady, setRemoteCameraReady] = useState(false)
   const [remoteReady, setRemoteReady] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState(false)
+
   const [connectionState, setConnectionState] =
     useState<RTCPeerConnectionState>("new")
   const [iceState, setIceState] = useState<RTCIceConnectionState>("new")
@@ -163,6 +182,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     connectionState === "connected" ||
     iceState === "connected" ||
     iceState === "completed"
+
   const isViewSwapped = !!room?.is_view_swapped
 
   const hostName = hostMember?.display_name || "Host"
@@ -220,7 +240,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     if (!room) return "Preparing your room"
 
     if (!partnerOnline) return "Waiting for partner"
-    if (!cameraReady) return "Allow your camera"
+    if (!cameraReady) return "Allow camera and mic"
     if (!liveConnected) return "Connecting cameras"
 
     if (isResultReady) return "Your photos are ready"
@@ -246,11 +266,19 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
 
     if (!cameraReady) {
-      return "Allow camera so your side can be captured."
+      return "Allow camera and microphone so your side can be seen and heard."
+    }
+
+    if (!hasTurnServer && !liveConnected) {
+      return "Still syncing. TURN credentials are missing, so different networks may fail to connect."
     }
 
     if (!liveConnected) {
-      return "Stay here while both cameras connect. If it takes too long, tap reconnect."
+      return "Stay here while both cameras connect. If it takes too long, tap reconnect on both devices."
+    }
+
+    if (!soundEnabled) {
+      return "Video is connected. Tap Enable Sound so you can hear your partner."
     }
 
     if (isResultReady) {
@@ -282,6 +310,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     partnerOnline,
     cameraReady,
     liveConnected,
+    soundEnabled,
     room?.status,
     room?.current_shot,
     isResultReady,
@@ -294,6 +323,16 @@ export default function DualCaptureClient({ roomCode }: Props) {
   useEffect(() => {
     currentRoleRef.current = currentRole
   }, [currentRole])
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = !soundEnabled
+      remoteVideoRef.current.volume = soundEnabled ? 1 : 0
+      remoteVideoRef.current.play().catch(() => undefined)
+    }
+  }, [soundEnabled])
 
   const fetchRoomState = useCallback(async () => {
     const { data: roomData, error: roomError } = await supabase
@@ -416,14 +455,44 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
   }
 
+  function attachLocalStream() {
+    if (!localVideoRef.current || !localStreamRef.current) return
+
+    if (localVideoRef.current.srcObject !== localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current
+    }
+
+    localVideoRef.current.muted = true
+    localVideoRef.current.volume = 0
+    localVideoRef.current.play().catch(() => undefined)
+  }
+
+  function attachRemoteStream() {
+    if (!remoteVideoRef.current || !remoteStreamRef.current) return
+
+    if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current
+    }
+
+    remoteVideoRef.current.muted = !soundEnabledRef.current
+    remoteVideoRef.current.volume = soundEnabledRef.current ? 1 : 0
+    remoteVideoRef.current.play().catch(() => undefined)
+  }
+
   async function startCamera() {
     try {
       setError("")
 
       if (localStreamRef.current) {
+        attachLocalStream()
         setCameraReady(true)
         await broadcastCameraReady()
         maybeStartConnection()
+        return
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Your browser does not support camera and microphone access.")
         return
       }
 
@@ -433,15 +502,15 @@ export default function DualCaptureClient({ roomCode }: Props) {
           height: { ideal: 720 },
           facingMode: "user",
         },
-        audio: false,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       })
 
       localStreamRef.current = stream
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream
-        await localVideoRef.current.play().catch(() => undefined)
-      }
+      attachLocalStream()
 
       setCameraReady(true)
 
@@ -453,9 +522,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
         maybeStartConnection()
       }, 300)
     } catch (cameraError) {
-      console.error("Camera error:", cameraError)
+      console.error("Camera/mic error:", cameraError)
       setCameraReady(false)
-      setError("Camera access is required for the capture stage.")
+      setError(
+        "Camera and microphone access are required. Please allow permission in your browser, then tap reconnect."
+      )
     }
   }
 
@@ -464,7 +535,10 @@ export default function DualCaptureClient({ roomCode }: Props) {
     if (!stream) return
 
     const existingTrackIds = new Set(
-      peer.getSenders().map((sender) => sender.track?.id).filter(Boolean)
+      peer
+        .getSenders()
+        .map((sender) => sender.track?.id)
+        .filter(Boolean)
     )
 
     stream.getTracks().forEach((track) => {
@@ -483,7 +557,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       payload: {
         from: currentUserIdRef.current,
         role: currentRoleRef.current,
-      },
+      } satisfies CameraReadyPayload,
     })
   }
 
@@ -493,32 +567,46 @@ export default function DualCaptureClient({ roomCode }: Props) {
     const peer = new RTCPeerConnection(rtcConfig)
 
     remoteStreamRef.current = new MediaStream()
-
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStreamRef.current
-      remoteVideoRef.current.play().catch(() => undefined)
-    }
+    attachRemoteStream()
 
     peer.ontrack = (event) => {
-      const stream = event.streams[0]
+      const remoteStream = remoteStreamRef.current ?? new MediaStream()
+      remoteStreamRef.current = remoteStream
 
-      stream.getTracks().forEach((track) => {
-        const alreadyAdded = remoteStreamRef.current
-          ?.getTracks()
+      const incomingTracks =
+        event.streams[0]?.getTracks().length > 0
+          ? event.streams[0].getTracks()
+          : [event.track]
+
+      incomingTracks.forEach((track) => {
+        const alreadyAdded = remoteStream
+          .getTracks()
           .some((existingTrack) => existingTrack.id === track.id)
 
         if (!alreadyAdded) {
-          remoteStreamRef.current?.addTrack(track)
+          remoteStream.addTrack(track)
+        }
+
+        if (track.kind === "video") {
+          setRemoteReady(true)
+          setError("")
+        }
+
+        track.onunmute = () => {
+          if (track.kind === "video") {
+            setRemoteReady(true)
+          }
+          attachRemoteStream()
+        }
+
+        track.onended = () => {
+          if (track.kind === "video") {
+            setRemoteReady(false)
+          }
         }
       })
 
-      if (remoteVideoRef.current && remoteStreamRef.current) {
-        remoteVideoRef.current.srcObject = remoteStreamRef.current
-        remoteVideoRef.current.play().catch(() => undefined)
-      }
-
-      setRemoteReady(true)
-      setError("")
+      attachRemoteStream()
     }
 
     peer.onicecandidate = async (event) => {
@@ -540,6 +628,10 @@ export default function DualCaptureClient({ roomCode }: Props) {
     peer.onconnectionstatechange = () => {
       setConnectionState(peer.connectionState)
 
+      if (peer.connectionState === "connected") {
+        setError("")
+      }
+
       if (
         peer.connectionState === "failed" ||
         peer.connectionState === "disconnected" ||
@@ -547,16 +639,37 @@ export default function DualCaptureClient({ roomCode }: Props) {
       ) {
         setRemoteReady(false)
       }
+
+      if (peer.connectionState === "failed") {
+        setError("Connection failed. Tap reconnect on both devices.")
+      }
     }
 
     peer.oniceconnectionstatechange = () => {
       setIceState(peer.iceConnectionState)
 
       if (
+        peer.iceConnectionState === "connected" ||
+        peer.iceConnectionState === "completed"
+      ) {
+        setError("")
+      }
+
+      if (
         peer.iceConnectionState === "failed" ||
         peer.iceConnectionState === "disconnected"
       ) {
         setRemoteReady(false)
+      }
+    }
+
+    peer.onicecandidateerror = (event) => {
+      console.error("ICE candidate error:", event)
+    }
+
+    peer.onnegotiationneeded = () => {
+      if (currentRoleRef.current === "host") {
+        makeOffer().catch(console.error)
       }
     }
 
@@ -647,7 +760,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       }
     } catch (offerError) {
       console.error("Handle offer error:", offerError)
-      setError("Live connection failed. Please tap reconnect.")
+      setError("Live connection failed. Please tap reconnect on both devices.")
     }
   }
 
@@ -664,6 +777,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       await flushPendingCandidates()
     } catch (answerError) {
       console.error("Handle answer error:", answerError)
+      setError("Answer failed. Tap reconnect on both devices.")
     }
   }
 
@@ -712,6 +826,22 @@ export default function DualCaptureClient({ roomCode }: Props) {
       makeOffer().catch(console.error)
     } else {
       broadcastCameraReady().catch(console.error)
+    }
+  }
+
+  async function enableSound() {
+    setSoundEnabled(true)
+    soundEnabledRef.current = true
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = false
+      remoteVideoRef.current.volume = 1
+
+      try {
+        await remoteVideoRef.current.play()
+      } catch (playError) {
+        console.error("Remote audio play error:", playError)
+      }
     }
   }
 
@@ -866,6 +996,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
       return
     }
 
+    if (!liveConnected) {
+      setError("Wait until both cameras are live before taking the photo.")
+      return
+    }
+
     const nextShot = room.current_shot >= 1 ? room.current_shot + 1 : 1
 
     if (nextShot > MAX_SHOTS) return
@@ -963,16 +1098,22 @@ export default function DualCaptureClient({ roomCode }: Props) {
       remoteVideoRef.current.srcObject = null
     }
 
-    if (!cameraReady) {
+    if (!localStreamRef.current) {
       await startCamera()
       return
     }
 
-    maybeStartConnection()
+    attachLocalStream()
+    setCameraReady(true)
+
+    const peer = createPeer()
+    addLocalTracks(peer)
+
     await broadcastCameraReady()
+    maybeStartConnection()
 
     if (currentRoleRef.current === "host") {
-      window.setTimeout(() => makeOffer(true).catch(console.error), 400)
+      window.setTimeout(() => makeOffer(true).catch(console.error), 500)
     }
   }
 
@@ -991,12 +1132,26 @@ export default function DualCaptureClient({ roomCode }: Props) {
   }, [roomCode])
 
   useEffect(() => {
+    if (!currentRole || cameraAutoStartedRef.current) return
+
+    cameraAutoStartedRef.current = true
+
+    window.setTimeout(() => {
+      startCamera().catch(console.error)
+    }, 350)
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRole])
+
+  useEffect(() => {
     if (!room?.id || !currentUserId || !currentRole) return
 
     const channel = supabase
       .channel(`dual-capture-${room.id}`)
       .on("broadcast", { event: "camera-ready" }, ({ payload }) => {
-        if (payload?.from !== currentUserIdRef.current) {
+        const readyPayload = payload as CameraReadyPayload
+
+        if (readyPayload?.from !== currentUserIdRef.current) {
           setRemoteCameraReady(true)
           maybeStartConnection()
 
@@ -1061,6 +1216,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       supabase.removeChannel(channel)
       channelRef.current = null
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.id, currentUserId, currentRole])
 
@@ -1080,6 +1236,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }, 2500)
 
     return () => window.clearInterval(interval)
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameraReady, partnerMember?.id, remoteReady])
 
@@ -1108,6 +1265,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       window.clearTimeout(tickCapture)
       window.clearTimeout(captureTimer)
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.status, room?.current_shot, cameraReady, currentRole])
 
@@ -1214,6 +1372,18 @@ export default function DualCaptureClient({ roomCode }: Props) {
             </button>
 
             <button
+              onClick={enableSound}
+              className="inline-flex items-center gap-1.5 rounded-full border border-amoura-red-soft/20 bg-black/30 px-3 py-2 text-[10px] font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45 sm:text-xs"
+            >
+              {soundEnabled ? (
+                <Volume2 className="h-3.5 w-3.5" />
+              ) : (
+                <VolumeX className="h-3.5 w-3.5" />
+              )}
+              {soundEnabled ? "Sound On" : "Enable Sound"}
+            </button>
+
+            <button
               onClick={reconnectCamera}
               className="rounded-full border border-amoura-red-soft/20 bg-black/30 p-2 text-amoura-cream transition hover:border-amoura-red-soft/45"
               aria-label="Reconnect camera"
@@ -1243,6 +1413,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
                 isLocal={slot.isLocal}
                 cameraReady={slot.cameraReady}
                 waiting={slot.waiting}
+                soundEnabled={soundEnabled}
                 onStartCamera={slot.isLocal ? startCamera : undefined}
               />
             ))}
@@ -1257,6 +1428,10 @@ export default function DualCaptureClient({ roomCode }: Props) {
             capturingShot={capturingShot}
             error={error}
             isResultReady={isResultReady}
+            connectionState={connectionState}
+            iceState={iceState}
+            hasTurnServer={hasTurnServer}
+            remoteCameraReady={remoteCameraReady}
           />
 
           {flash ? (
@@ -1298,6 +1473,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
                 disabled={
                   !cameraReady ||
                   !partnerOnline ||
+                  !liveConnected ||
                   room.status === "countdown" ||
                   room.status === "capturing" ||
                   room.status === "completed"
@@ -1334,14 +1510,16 @@ function JoinedVideoStage({
   isLocal = false,
   cameraReady,
   waiting = false,
+  soundEnabled,
   onStartCamera,
 }: {
   label: string
   name: string
-  videoRef: React.RefObject<HTMLVideoElement | null>
+  videoRef: RefObject<HTMLVideoElement | null>
   isLocal?: boolean
   cameraReady: boolean
   waiting?: boolean
+  soundEnabled: boolean
   onStartCamera?: () => void
 }) {
   return (
@@ -1350,7 +1528,7 @@ function JoinedVideoStage({
         ref={videoRef}
         autoPlay
         playsInline
-        muted
+        muted={isLocal || !soundEnabled}
         className={`h-full w-full object-cover ${isLocal ? "scale-x-[-1]" : ""}`}
       />
 
@@ -1380,10 +1558,10 @@ function JoinedVideoStage({
             <>
               <VideoOff className="h-9 w-9 text-amoura-red-soft sm:h-12 sm:w-12" />
               <p className="mt-3 text-xs font-semibold text-amoura-cream sm:text-sm">
-                Camera needed
+                Camera and mic needed
               </p>
-              <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-amoura-muted sm:max-w-xs sm:text-xs sm:leading-5">
-                Allow camera to capture your side.
+              <p className="mt-1 max-w-[160px] text-[10px] leading-4 text-amoura-muted sm:max-w-xs sm:text-xs sm:leading-5">
+                Allow camera and microphone to join the live capture.
               </p>
 
               {onStartCamera ? (
@@ -1391,8 +1569,8 @@ function JoinedVideoStage({
                   onClick={onStartCamera}
                   className="amoura-btn-primary mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold sm:px-5 sm:py-3 sm:text-sm"
                 >
-                  <Camera className="h-4 w-4" />
-                  Allow
+                  <Mic className="h-4 w-4" />
+                  Allow Camera & Mic
                 </button>
               ) : null}
             </>
@@ -1412,6 +1590,10 @@ function CaptureCenterOverlay({
   capturingShot,
   error,
   isResultReady,
+  connectionState,
+  iceState,
+  hasTurnServer,
+  remoteCameraReady,
 }: {
   title: string
   subtitle: string
@@ -1421,6 +1603,10 @@ function CaptureCenterOverlay({
   capturingShot: number | null
   error: string
   isResultReady: boolean
+  connectionState: RTCPeerConnectionState
+  iceState: RTCIceConnectionState
+  hasTurnServer: boolean
+  remoteCameraReady: boolean
 }) {
   const isCounting = countdown !== null
 
@@ -1457,6 +1643,27 @@ function CaptureCenterOverlay({
             <p className="mx-auto mt-1.5 max-w-sm text-[11px] leading-5 text-amoura-muted sm:text-sm sm:leading-6">
               {subtitle}
             </p>
+
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-amoura-muted">
+              <span className="rounded-full border border-white/10 bg-black/35 px-2 py-1">
+                Peer: {connectionState}
+              </span>
+              <span className="rounded-full border border-white/10 bg-black/35 px-2 py-1">
+                ICE: {iceState}
+              </span>
+              <span className="rounded-full border border-white/10 bg-black/35 px-2 py-1">
+                Remote: {remoteCameraReady ? "ready" : "waiting"}
+              </span>
+              <span
+                className={`rounded-full border px-2 py-1 ${
+                  hasTurnServer
+                    ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
+                    : "border-amber-400/20 bg-amber-500/10 text-amber-200"
+                }`}
+              >
+                TURN: {hasTurnServer ? "on" : "missing"}
+              </span>
+            </div>
 
             {capturingShot ? (
               <div className="mt-2 text-xs font-semibold text-amoura-cream sm:text-sm">
