@@ -8,7 +8,6 @@ import {
   Check,
   Heart,
   Loader2,
-  RotateCcw,
   Sparkles,
   Users,
   VideoOff,
@@ -124,11 +123,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
   }, [room, hostPhotos.length, partnerPhotos.length])
 
   const stageTitle = useMemo(() => {
-    if (!room) return "Preparing room..."
+    if (!room) return "Preparing room"
 
-    if (!partnerOnline) return "Waiting for your partner"
+    if (!partnerOnline) return "Waiting for partner"
     if (!cameraReady) return "Allow your camera"
-    if (!liveConnected) return "Connecting live preview"
+    if (!liveConnected) return "Connecting cameras"
 
     if (room.status === "between_shots" && room.current_shot === 1) {
       return "Photo 1 captured"
@@ -151,7 +150,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
   const stageSubtitle = useMemo(() => {
     if (!partnerOnline) {
-      return "Your partner is offline or has not entered the capture room yet."
+      return "Keep this room open. We’ll continue once your partner reconnects."
     }
 
     if (!cameraReady) {
@@ -159,34 +158,34 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
 
     if (!liveConnected) {
-      return "Keep this page open while both cameras connect."
+      return "Stay here while both cameras connect."
     }
 
     if (room?.status === "between_shots" && room.current_shot === 1) {
-      return "Great shot! Change your pose, make heart hands, or move closer before photo 2."
+      return "Change your pose before photo 2. Heart hands are perfect here."
     }
 
     if (room?.status === "between_shots" && room.current_shot === 2) {
-      return "Awesome. One last pose — make the final photo count."
+      return "One last pose. Make the final photo count."
     }
 
     if (room?.status === "completed") {
-      return "Your dual photostrip is ready. Preparing your result..."
+      return "Preparing your dual photostrip..."
     }
 
     if (room?.current_shot === 1) {
-      return "Make your first pose. Look at the camera and smile."
+      return "First pose. Smile and look at the camera."
     }
 
     if (room?.current_shot === 2) {
-      return "Change your pose for the second photo."
+      return "Second pose. Move closer or try something cute."
     }
 
     if (room?.current_shot === 3) {
-      return "Last one — make it sweet, funny, or romantic."
+      return "Final pose. Make it sweet, funny, or romantic."
     }
 
-    return "When you are both ready, the host can start the first photo."
+    return "The host can start when both cameras are connected."
   }, [partnerOnline, cameraReady, liveConnected, room?.status, room?.current_shot])
 
   const fetchRoomState = useCallback(async () => {
@@ -547,11 +546,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
     })
 
     if (shot === 1) {
-      setCaptureMessage("Great shot! Prepare for photo 2.")
+      setCaptureMessage("Photo 1 saved. Prepare for photo 2.")
     } else if (shot === 2) {
-      setCaptureMessage("Awesome. One more to go.")
+      setCaptureMessage("Photo 2 saved. One final pose left.")
     } else {
-      setCaptureMessage("All photos captured! Preparing your strip.")
+      setCaptureMessage("All photos captured. Preparing your strip.")
     }
 
     window.setTimeout(() => {
@@ -783,9 +782,14 @@ export default function DualCaptureClient({ roomCode }: Props) {
   if (loading) {
     return (
       <main className="amoura-page flex min-h-screen items-center justify-center px-6">
-        <div className="text-center">
+        <div className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-8 text-center backdrop-blur-xl">
           <Loader2 className="mx-auto h-9 w-9 animate-spin text-amoura-red-soft" />
-          <p className="mt-4 text-amoura-muted">Opening capture stage...</p>
+          <p className="mt-4 font-semibold text-amoura-cream">
+            Opening capture stage...
+          </p>
+          <p className="mt-2 text-sm text-amoura-muted">
+            Preparing your dual photobooth.
+          </p>
         </div>
       </main>
     )
@@ -816,8 +820,6 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
   return (
     <main className="amoura-page min-h-screen overflow-hidden px-3 py-3 sm:px-4">
-      <LandscapeNotice />
-
       <section className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-7xl flex-col gap-3">
         <header className="flex shrink-0 items-center justify-between gap-3 rounded-[1.25rem] border border-amoura-red-soft/20 bg-black/45 px-4 py-3 backdrop-blur-xl">
           <button
@@ -841,29 +843,31 @@ export default function DualCaptureClient({ roomCode }: Props) {
                 liveConnected ? "bg-emerald-400" : "bg-zinc-400"
               }`}
             />
-            {liveConnected ? "Connected" : "Connecting"}
+            {liveConnected ? "Live" : "Syncing"}
           </div>
         </header>
 
-        <section className="relative grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
-          <VideoStage
-            label="You"
-            name={currentMember?.display_name || "You"}
-            videoRef={localVideoRef}
-            isLocal
-            cameraReady={cameraReady}
-            onStartCamera={startCamera}
-          />
+        <section className="relative min-h-0 flex-1 overflow-hidden rounded-[1.6rem] border border-amoura-red-soft/20 bg-black shadow-[0_0_70px_rgba(194,31,58,0.16)]">
+          <div className="absolute inset-0 grid grid-cols-2">
+            <JoinedVideoStage
+              label="You"
+              name={currentMember?.display_name || "You"}
+              videoRef={localVideoRef}
+              isLocal
+              cameraReady={cameraReady}
+              onStartCamera={startCamera}
+            />
 
-          <VideoStage
-            label="Partner"
-            name={partnerMember?.display_name || "Partner"}
-            videoRef={remoteVideoRef}
-            cameraReady={remoteReady}
-            waiting={!partnerOnline}
-          />
+            <JoinedVideoStage
+              label="Partner"
+              name={partnerMember?.display_name || "Partner"}
+              videoRef={remoteVideoRef}
+              cameraReady={remoteReady}
+              waiting={!partnerOnline}
+            />
+          </div>
 
-          <CaptureOverlay
+          <CaptureCenterOverlay
             title={stageTitle}
             subtitle={stageSubtitle}
             countdown={countdown}
@@ -874,8 +878,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
           />
         </section>
 
-        <footer className="grid shrink-0 gap-3 rounded-[1.25rem] border border-amoura-red-soft/20 bg-black/45 p-3 backdrop-blur-xl lg:grid-cols-[1fr_auto] lg:items-center">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-amoura-muted">
+        <footer className="shrink-0 rounded-[1.25rem] border border-amoura-red-soft/20 bg-black/55 p-3 backdrop-blur-xl">
+          <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-xs text-amoura-muted">
             <ProgressChip
               label="Photo 1"
               done={hostPhotos.length >= 1 && partnerPhotos.length >= 1}
@@ -893,7 +897,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
             />
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-[auto_auto]">
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
             {isHost ? (
               <button
                 onClick={startNextPhoto}
@@ -905,20 +909,20 @@ export default function DualCaptureClient({ roomCode }: Props) {
                   room.status === "capturing" ||
                   room.status === "completed"
                 }
-                className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Camera className="h-4 w-4" />
                 {nextPhotoLabel}
               </button>
             ) : (
-              <div className="rounded-full border border-amoura-red-soft/20 bg-black/40 px-5 py-3 text-center text-sm font-semibold text-amoura-muted">
+              <div className="rounded-full border border-amoura-red-soft/20 bg-black/40 px-5 py-4 text-center text-sm font-semibold text-amoura-muted">
                 Waiting for host to start the next photo
               </div>
             )}
 
             <button
               onClick={leaveCapture}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-5 py-3 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-5 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
             >
               <ArrowLeft className="h-4 w-4" />
               Leave
@@ -930,24 +934,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
   )
 }
 
-function LandscapeNotice() {
-  return (
-    <div className="fixed inset-0 z-[60] hidden items-center justify-center bg-black/90 p-6 text-center portrait:flex md:hidden">
-      <div className="max-w-sm rounded-[1.6rem] border border-amoura-red-soft/20 bg-[#0b0608] p-7">
-        <RotateCcw className="mx-auto h-10 w-10 text-amoura-red-soft" />
-        <h2 className="amoura-serif mt-5 text-3xl text-amoura-cream">
-          Rotate your phone
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-amoura-muted">
-          Dual Mode works best in landscape so both of you can fit in frame and
-          pose together clearly.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function VideoStage({
+function JoinedVideoStage({
   label,
   name,
   videoRef,
@@ -965,7 +952,7 @@ function VideoStage({
   onStartCamera?: () => void
 }) {
   return (
-    <section className="relative min-h-[260px] overflow-hidden rounded-[1.5rem] border border-amoura-red-soft/20 bg-black sm:min-h-[360px] lg:min-h-0">
+    <section className="relative h-full min-h-[420px] overflow-hidden border-r border-white/10 last:border-r-0">
       <video
         ref={videoRef}
         autoPlay
@@ -974,50 +961,45 @@ function VideoStage({
         className={`h-full w-full object-cover ${isLocal ? "scale-x-[-1]" : ""}`}
       />
 
-      <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-amoura-cream backdrop-blur">
-        {label}: {name}
+      <div className="absolute left-2 top-2 rounded-full border border-white/10 bg-black/50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amoura-cream backdrop-blur sm:left-4 sm:top-4 sm:px-4 sm:py-2 sm:text-xs">
+        {label}
+      </div>
+
+      <div className="absolute bottom-2 left-2 right-2 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 text-center backdrop-blur sm:bottom-4 sm:left-4 sm:right-4">
+        <p className="truncate text-xs font-semibold text-amoura-cream sm:text-sm">
+          {name}
+        </p>
       </div>
 
       {!cameraReady ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 px-3 text-center">
           {waiting ? (
             <>
-              <Users className="h-12 w-12 text-amoura-red-soft" />
-              <p className="mt-4 text-sm font-semibold text-amoura-cream">
-                Partner is offline
+              <Users className="h-9 w-9 text-amoura-red-soft sm:h-12 sm:w-12" />
+              <p className="mt-3 text-xs font-semibold text-amoura-cream sm:text-sm">
+                Partner offline
               </p>
-              <p className="mt-2 max-w-xs text-xs leading-5 text-amoura-muted">
-                Keep this page open. We’ll continue once your partner reconnects.
+              <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-amoura-muted sm:max-w-xs sm:text-xs sm:leading-5">
+                Waiting for your partner to reconnect.
               </p>
-              <div className="mt-4 flex justify-center gap-1">
-                <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-amoura-red-soft" />
-                <span
-                  className="h-2.5 w-2.5 animate-bounce rounded-full bg-amoura-red-soft"
-                  style={{ animationDelay: "0.12s" }}
-                />
-                <span
-                  className="h-2.5 w-2.5 animate-bounce rounded-full bg-amoura-red-soft"
-                  style={{ animationDelay: "0.24s" }}
-                />
-              </div>
             </>
           ) : (
             <>
-              <VideoOff className="h-12 w-12 text-amoura-red-soft" />
-              <p className="mt-4 text-sm font-semibold text-amoura-cream">
-                Camera required
+              <VideoOff className="h-9 w-9 text-amoura-red-soft sm:h-12 sm:w-12" />
+              <p className="mt-3 text-xs font-semibold text-amoura-cream sm:text-sm">
+                Camera needed
               </p>
-              <p className="mt-2 text-xs leading-5 text-amoura-muted">
-                Allow camera so your side can be captured.
+              <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-amoura-muted sm:max-w-xs sm:text-xs sm:leading-5">
+                Allow camera to capture your side.
               </p>
 
               {onStartCamera ? (
                 <button
                   onClick={onStartCamera}
-                  className="amoura-btn-primary mt-5 inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold"
+                  className="amoura-btn-primary mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold sm:px-5 sm:py-3 sm:text-sm"
                 >
                   <Camera className="h-4 w-4" />
-                  Allow Camera
+                  Allow
                 </button>
               ) : null}
             </>
@@ -1028,7 +1010,7 @@ function VideoStage({
   )
 }
 
-function CaptureOverlay({
+function CaptureCenterOverlay({
   title,
   subtitle,
   countdown,
@@ -1045,42 +1027,52 @@ function CaptureOverlay({
   capturingShot: number | null
   error: string
 }) {
+  const isCounting = countdown !== null
+
   return (
-    <div className="pointer-events-none absolute inset-x-3 top-3 z-20 mx-auto max-w-xl rounded-[1.5rem] border border-amoura-red-soft/20 bg-black/55 p-5 text-center shadow-2xl backdrop-blur-xl">
-      <div className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/20 bg-amoura-red/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amoura-red-soft">
-        <Sparkles className="h-4 w-4" />
-        {shot ? `Shot ${shot} of 3` : "Capture stage"}
-      </div>
-
-      <h1 className="amoura-serif text-3xl leading-none text-amoura-cream sm:text-4xl">
-        {title}
-      </h1>
-
-      <p className="mt-2 text-sm leading-6 text-amoura-muted">{subtitle}</p>
-
-      {countdown !== null ? (
-        <div className="amoura-serif mt-4 animate-pulse text-7xl leading-none text-amoura-red-soft">
-          {countdown > 0 ? countdown : "Smile!"}
+    <div
+      className={`pointer-events-none absolute left-1/2 top-1/2 z-20 w-[min(92vw,430px)] -translate-x-1/2 -translate-y-1/2 text-center transition ${
+        isCounting ? "scale-100" : "scale-95"
+      }`}
+    >
+      {isCounting ? (
+        <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border border-amoura-red-soft/50 bg-black/70 text-6xl font-bold text-amoura-cream shadow-[0_0_80px_rgba(194,31,58,0.45)] backdrop-blur-xl sm:h-44 sm:w-44 sm:text-8xl">
+          {countdown > 0 ? countdown : "📸"}
         </div>
-      ) : null}
+      ) : (
+        <div className="rounded-[1.4rem] border border-amoura-red-soft/20 bg-black/45 p-4 shadow-2xl backdrop-blur-xl sm:p-5">
+          <div className="mx-auto mb-2 inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/20 bg-amoura-red/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amoura-red-soft sm:text-xs">
+            <Sparkles className="h-3.5 w-3.5" />
+            {shot ? `Photo ${shot} of 3` : "Capture stage"}
+          </div>
 
-      {capturingShot ? (
-        <div className="mt-4 text-sm font-semibold text-amoura-cream">
-          Capturing photo {capturingShot}...
-        </div>
-      ) : null}
+          <h1 className="amoura-serif text-2xl leading-none text-amoura-cream sm:text-4xl">
+            {title}
+          </h1>
 
-      {message ? (
-        <div className="mt-4 rounded-full border border-amoura-red-soft/20 bg-black/40 px-4 py-2 text-sm text-amoura-cream">
-          {message}
-        </div>
-      ) : null}
+          <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-amoura-muted sm:text-sm sm:leading-6">
+            {subtitle}
+          </p>
 
-      {error ? (
-        <div className="mt-4 rounded-2xl border border-rose-300/15 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-          {error}
+          {capturingShot ? (
+            <div className="mt-3 text-sm font-semibold text-amoura-cream">
+              Capturing photo {capturingShot}...
+            </div>
+          ) : null}
+
+          {message ? (
+            <div className="mt-3 rounded-full border border-amoura-red-soft/20 bg-black/40 px-4 py-2 text-xs text-amoura-cream sm:text-sm">
+              {message}
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="mt-3 rounded-2xl border border-rose-300/15 bg-rose-500/10 px-4 py-3 text-xs text-rose-200 sm:text-sm">
+              {error}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      )}
     </div>
   )
 }
