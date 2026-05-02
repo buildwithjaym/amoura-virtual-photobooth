@@ -20,9 +20,10 @@ type StripDesign = {
   subtitle: string
   brand: string
   accent: string
+  palette: string[]
   backgroundClass: string
   outerBorderClass: string
-  innerCardClass: string
+  photoFrameClass: string
   titleClass: string
   subtitleClass: string
   canvas: {
@@ -32,7 +33,15 @@ type StripDesign = {
     text: string
     mutedText: string
     accent: string
-    decoration: "hearts" | "stars" | "film" | "minimal" | "flowers" | "party"
+    decoration:
+      | "noir"
+      | "romance"
+      | "vintage"
+      | "barkada"
+      | "white"
+      | "midnight"
+      | "kawaii"
+      | "retro"
   }
 }
 
@@ -44,38 +53,55 @@ type FilterOption = {
   canvasFilter: string
 }
 
-type FillerOption = {
-  id: string
-  name: string
-  subtitle: string
-  emoji: string
-}
-
 const STORAGE_KEY = "amoreframe_single_photos"
 const MAX_PHOTOS = 3
 const MAX_CAPTION = 50
-const MAX_ACTIVE_FILLERS = 2
 
 const STRIP_WIDTH = 900
 const PHOTO_WIDTH = 760
 const PHOTO_HEIGHT = 560
-const TOP_PADDING = 112
-const GAP = 38
-const BOTTOM_PADDING = 200
+const TOP_PADDING = 110
+const GAP = 34
+const BOTTOM_PADDING = 190
 const STRIP_HEIGHT =
   TOP_PADDING + PHOTO_HEIGHT * MAX_PHOTOS + GAP * (MAX_PHOTOS - 1) + BOTTOM_PADDING
 
 const STRIP_DESIGNS: StripDesign[] = [
   {
-    id: "soft-romance",
-    name: "Soft Romance",
-    subtitle: "Pink, sweet, and made for love.",
+    id: "noir-date",
+    name: "Noir Date",
+    subtitle: "Cinematic, bold, and undeniably classic.",
     brand: "AmoreFrame",
     accent: "♥",
+    palette: ["#070707", "#e85d75", "#242424", "#f5e7e7"],
     backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#ffe4ee_0%,#fff7fa_42%,#ffd6e3_100%)]",
-    outerBorderClass: "border-pink-200/80",
-    innerCardClass: "border-white shadow-[0_14px_35px_rgba(190,24,93,0.16)]",
+      "bg-[radial-gradient(circle_at_top,#44101a_0%,#13080d_42%,#030303_100%)]",
+    outerBorderClass: "border-rose-900/70",
+    photoFrameClass:
+      "border-rose-300/20 shadow-[0_18px_40px_rgba(0,0,0,0.48)]",
+    titleClass: "text-rose-100",
+    subtitleClass: "text-rose-300",
+    canvas: {
+      background: "#070707",
+      border: "#7f1d1d",
+      photoBorder: "#881337",
+      text: "#ffe4e6",
+      mutedText: "#fda4af",
+      accent: "#fb7185",
+      decoration: "noir",
+    },
+  },
+  {
+    id: "soft-romance",
+    name: "Soft Romance",
+    subtitle: "Warm, tender, and full of love.",
+    brand: "AmoreFrame",
+    accent: "♥",
+    palette: ["#ffd6e3", "#fff4f7", "#f9a8d4", "#e85d75"],
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#ffe4ee_0%,#fff7fa_42%,#ffd1df_100%)]",
+    outerBorderClass: "border-pink-200/90",
+    photoFrameClass: "border-white shadow-[0_14px_35px_rgba(190,24,93,0.16)]",
     titleClass: "text-rose-900",
     subtitleClass: "text-rose-700",
     canvas: {
@@ -85,66 +111,21 @@ const STRIP_DESIGNS: StripDesign[] = [
       text: "#881337",
       mutedText: "#be185d",
       accent: "#e11d48",
-      decoration: "hearts",
+      decoration: "romance",
     },
   },
   {
-    id: "noir-date",
-    name: "Noir Date",
-    subtitle: "Dark, intimate, and cinematic.",
-    brand: "AmoreFrame",
-    accent: "♥",
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#4b0d1b_0%,#180b12_42%,#050505_100%)]",
-    outerBorderClass: "border-rose-900/60",
-    innerCardClass:
-      "border-rose-300/20 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
-    titleClass: "text-rose-100",
-    subtitleClass: "text-rose-300",
-    canvas: {
-      background: "#0a0a0b",
-      border: "#7f1d1d",
-      photoBorder: "#881337",
-      text: "#ffe4e6",
-      mutedText: "#fda4af",
-      accent: "#fb7185",
-      decoration: "stars",
-    },
-  },
-  {
-    id: "barkada-fun",
-    name: "Barkada Fun",
-    subtitle: "Colorful, playful, and full of energy.",
-    brand: "AmoreFrame",
-    accent: "✿",
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#fff6ab_0%,#fffef1_36%,#ffd49d_100%)]",
-    outerBorderClass: "border-orange-200/80",
-    innerCardClass:
-      "border-white shadow-[0_12px_28px_rgba(234,88,12,0.18)]",
-    titleClass: "text-orange-950",
-    subtitleClass: "text-orange-700",
-    canvas: {
-      background: "#fff7d1",
-      border: "#fdba74",
-      photoBorder: "#ffffff",
-      text: "#431407",
-      mutedText: "#c2410c",
-      accent: "#f97316",
-      decoration: "party",
-    },
-  },
-  {
-    id: "vintage-love",
-    name: "Vintage Love",
-    subtitle: "Warm nostalgia with film charm.",
+    id: "vintage-film",
+    name: "Vintage Film",
+    subtitle: "Timeless grain, real film nostalgia.",
     brand: "AmoreFrame",
     accent: "✦",
+    palette: ["#e8d2aa", "#c8a46f", "#5c3212", "#f4e5c7"],
     backgroundClass:
       "bg-[linear-gradient(to_bottom,#ead7b7,#d7bc91,#efdcbc)]",
-    outerBorderClass: "border-amber-800/35",
-    innerCardClass:
-      "border-amber-950/20 shadow-[0_14px_32px_rgba(92,52,18,0.2)]",
+    outerBorderClass: "border-amber-800/40",
+    photoFrameClass:
+      "border-amber-950/20 shadow-[0_14px_32px_rgba(92,52,18,0.22)]",
     titleClass: "text-amber-950",
     subtitleClass: "text-amber-900",
     canvas: {
@@ -154,19 +135,43 @@ const STRIP_DESIGNS: StripDesign[] = [
       text: "#451a03",
       mutedText: "#78350f",
       accent: "#92400e",
-      decoration: "film",
+      decoration: "vintage",
+    },
+  },
+  {
+    id: "barkada-fun",
+    name: "Barkada Fun",
+    subtitle: "Vibrant, playful, and made for memories.",
+    brand: "AmoreFrame",
+    accent: "✿",
+    palette: ["#ff7a30", "#7ac957", "#6ecbff", "#ffd84d", "#c77dff"],
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#fff6ab_0%,#fffef1_36%,#ffbf83_100%)]",
+    outerBorderClass: "border-orange-200/90",
+    photoFrameClass: "border-white shadow-[0_12px_28px_rgba(234,88,12,0.18)]",
+    titleClass: "text-orange-950",
+    subtitleClass: "text-orange-700",
+    canvas: {
+      background: "#fff7d1",
+      border: "#fb923c",
+      photoBorder: "#ffffff",
+      text: "#431407",
+      mutedText: "#c2410c",
+      accent: "#f97316",
+      decoration: "barkada",
     },
   },
   {
     id: "pure-white",
     name: "Pure White",
-    subtitle: "Minimal, clean, and elegant.",
+    subtitle: "Clean, minimal, and elegantly yours.",
     brand: "AmoreFrame",
-    accent: "♡",
+    accent: "♥",
+    palette: ["#ffffff", "#f2f2f2", "#d4d4d4", "#111111"],
     backgroundClass:
-      "bg-[linear-gradient(to_bottom,#fcfcfb,#f8f7f4,#f4f1ec)]",
-    outerBorderClass: "border-neutral-300/80",
-    innerCardClass: "border-neutral-200 shadow-[0_14px_32px_rgba(0,0,0,0.12)]",
+      "bg-[linear-gradient(to_bottom,#ffffff,#f8f7f4,#f1eee8)]",
+    outerBorderClass: "border-neutral-300/90",
+    photoFrameClass: "border-neutral-200 shadow-[0_14px_32px_rgba(0,0,0,0.12)]",
     titleClass: "text-neutral-900",
     subtitleClass: "text-neutral-500",
     canvas: {
@@ -174,22 +179,23 @@ const STRIP_DESIGNS: StripDesign[] = [
       border: "#d4d4d4",
       photoBorder: "#e5e5e5",
       text: "#171717",
-      mutedText: "#6b7280",
-      accent: "#111827",
-      decoration: "minimal",
+      mutedText: "#737373",
+      accent: "#111111",
+      decoration: "white",
     },
   },
   {
     id: "midnight-luxe",
     name: "Midnight Luxe",
-    subtitle: "Elegant black with a luxe glow.",
+    subtitle: "Dark, luxe, and perfect for night owls.",
     brand: "AmoreFrame",
-    accent: "✦",
+    accent: "☾",
+    palette: ["#080808", "#1f1117", "#5a2a2a", "#d6a85f"],
     backgroundClass:
       "bg-[radial-gradient(circle_at_top,#352713_0%,#141016_40%,#050505_100%)]",
-    outerBorderClass: "border-amber-500/30",
-    innerCardClass:
-      "border-amber-300/20 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
+    outerBorderClass: "border-amber-500/35",
+    photoFrameClass:
+      "border-amber-300/20 shadow-[0_18px_40px_rgba(0,0,0,0.48)]",
     titleClass: "text-amber-100",
     subtitleClass: "text-amber-300",
     canvas: {
@@ -199,7 +205,53 @@ const STRIP_DESIGNS: StripDesign[] = [
       text: "#fef3c7",
       mutedText: "#fcd34d",
       accent: "#f59e0b",
-      decoration: "stars",
+      decoration: "midnight",
+    },
+  },
+  {
+    id: "kawaii-love",
+    name: "Kawaii Love",
+    subtitle: "Cute, soft, and sweet like a sticker diary.",
+    brand: "AmoreFrame",
+    accent: "♡",
+    palette: ["#ffc7e1", "#fff1f8", "#c7d2fe", "#f9a8d4"],
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#ffd8eb_0%,#fff4fa_45%,#dbe4ff_100%)]",
+    outerBorderClass: "border-pink-200/80",
+    photoFrameClass: "border-white shadow-[0_14px_35px_rgba(236,72,153,0.14)]",
+    titleClass: "text-pink-900",
+    subtitleClass: "text-pink-600",
+    canvas: {
+      background: "#fff0f7",
+      border: "#f9a8d4",
+      photoBorder: "#ffffff",
+      text: "#831843",
+      mutedText: "#db2777",
+      accent: "#ec4899",
+      decoration: "kawaii",
+    },
+  },
+  {
+    id: "retro-pop",
+    name: "Retro Pop",
+    subtitle: "Bright, funky, and fun for barkada shots.",
+    brand: "AmoreFrame",
+    accent: "★",
+    palette: ["#ff5b45", "#ffd447", "#3ecf8e", "#5bbcff"],
+    backgroundClass:
+      "bg-[linear-gradient(135deg,#ffdf6e,#ff8f70_45%,#6ee7b7)]",
+    outerBorderClass: "border-yellow-300/70",
+    photoFrameClass: "border-white shadow-[0_12px_30px_rgba(255,91,69,0.2)]",
+    titleClass: "text-zinc-950",
+    subtitleClass: "text-zinc-800",
+    canvas: {
+      background: "#ffd866",
+      border: "#f97316",
+      photoBorder: "#ffffff",
+      text: "#18181b",
+      mutedText: "#7c2d12",
+      accent: "#ef4444",
+      decoration: "retro",
     },
   },
 ]
@@ -244,79 +296,10 @@ const FILTERS: FilterOption[] = [
   },
 ]
 
-const FILLERS: FillerOption[] = [
-  {
-    id: "hearts",
-    name: "Hearts",
-    subtitle: "Romantic border",
-    emoji: "💖",
-  },
-  {
-    id: "tiny-hearts",
-    name: "Tiny Hearts",
-    subtitle: "Soft love pattern",
-    emoji: "💕",
-  },
-  {
-    id: "flowers",
-    name: "Flowers",
-    subtitle: "Sweet romance",
-    emoji: "🌸",
-  },
-  {
-    id: "sparkles",
-    name: "Sparkles",
-    subtitle: "Dreamy shine",
-    emoji: "✨",
-  },
-  {
-    id: "fireworks",
-    name: "Fireworks",
-    subtitle: "Barkada celebration",
-    emoji: "🎆",
-  },
-  {
-    id: "teddy",
-    name: "Teddy Bear",
-    subtitle: "Cute and cozy",
-    emoji: "🧸",
-  },
-  {
-    id: "cat",
-    name: "Cat",
-    subtitle: "Playful cute vibe",
-    emoji: "🐱",
-  },
-  {
-    id: "bow",
-    name: "Bow",
-    subtitle: "Pretty and charming",
-    emoji: "🎀",
-  },
-]
-
-const PREVIEW_FILLER_POINTS = [
-  { top: "5%", left: "6%" },
-  { top: "5%", right: "6%" },
-  { top: "17%", left: "5%" },
-  { top: "17%", right: "5%" },
-  { top: "31%", left: "5%" },
-  { top: "31%", right: "5%" },
-  { top: "45%", left: "5%" },
-  { top: "45%", right: "5%" },
-  { top: "59%", left: "5%" },
-  { top: "59%", right: "5%" },
-  { top: "73%", left: "5%" },
-  { top: "73%", right: "5%" },
-  { bottom: "6%", left: "8%" },
-  { bottom: "6%", right: "8%" },
-]
-
 export default function ResultClient() {
   const [photos, setPhotos] = useState<string[]>([])
   const [selectedDesignId, setSelectedDesignId] = useState("noir-date")
   const [selectedFilterId, setSelectedFilterId] = useState("original")
-  const [selectedFillers, setSelectedFillers] = useState<string[]>(["hearts"])
   const [caption, setCaption] = useState("")
   const [draftCaption, setDraftCaption] = useState("")
   const [isCaptionModalOpen, setIsCaptionModalOpen] = useState(false)
@@ -372,20 +355,6 @@ export default function ResultClient() {
     setIsCaptionModalOpen(false)
   }
 
-  function toggleFiller(id: string) {
-    setSelectedFillers((previous) => {
-      if (previous.includes(id)) {
-        return previous.filter((item) => item !== id)
-      }
-
-      if (previous.length >= MAX_ACTIVE_FILLERS) {
-        return [...previous.slice(1), id]
-      }
-
-      return [...previous, id]
-    })
-  }
-
   async function downloadStrip() {
     if (previewPhotos.length === 0 || isDownloading) return
 
@@ -405,7 +374,6 @@ export default function ResultClient() {
         design: selectedDesign,
         filter: selectedFilter,
         caption,
-        fillers: selectedFillers,
       })
 
       const link = document.createElement("a")
@@ -453,51 +421,39 @@ export default function ResultClient() {
                     Strip Editor
                   </p>
                   <p className="text-xs text-amoura-muted">
-                    Theme, filter, fillers, caption
+                    Theme, filter, caption, download
                   </p>
                 </div>
               </div>
             </header>
 
-            <section className="mt-4 grid gap-4 lg:grid-cols-[minmax(280px,0.82fr)_minmax(400px,1.18fr)]">
+            <section className="mt-4 grid gap-4 lg:grid-cols-[minmax(250px,0.75fr)_minmax(420px,1.25fr)]">
               <section className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-3 backdrop-blur-xl sm:p-5">
-                <div className="flex h-[500px] items-center justify-center sm:h-[610px] lg:h-[calc(100vh-9.5rem)] lg:min-h-[540px] lg:max-h-[700px]">
+                <div className="flex h-[470px] items-center justify-center sm:h-[560px] lg:h-[calc(100vh-9.75rem)] lg:min-h-[500px] lg:max-h-[660px]">
                   <PhotostripPreview
                     photos={previewPhotos}
                     design={selectedDesign}
                     filter={selectedFilter}
                     caption={caption}
-                    fillers={selectedFillers}
                   />
                 </div>
               </section>
 
-              <aside className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-white/[0.035] p-4 sm:p-5 lg:max-h-[calc(100vh-9.5rem)] lg:overflow-y-auto">
-                <div className="inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/25 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-amoura-pink">
-                  <Sparkles className="h-4 w-4" />
-                  Customize Your Strip
+              <aside className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-white/[0.035] p-4 sm:p-5 lg:max-h-[calc(100vh-9.75rem)] lg:overflow-y-auto">
+                <div className="text-center">
+                  <p className="text-sm font-bold uppercase tracking-[0.24em] text-amoura-red-soft">
+                    Premium Booth Themes
+                  </p>
+                  <h1 className="amoura-serif mt-3 text-4xl leading-none text-amoura-cream sm:text-5xl">
+                    Every vibe. Every moment.
+                  </h1>
+                  <p className="mt-3 text-base text-amoura-muted">
+                    Your story, your style.
+                  </p>
                 </div>
 
-                <h1 className="amoura-serif mt-4 text-3xl leading-tight text-amoura-cream sm:text-4xl">
-                  Every vibe. Every moment.
-                </h1>
-
-                <p className="mt-3 text-sm leading-6 text-amoura-muted">
-                  Pick a booth theme, apply a cute filter, add up to 2 border
-                  fillers, write a short caption, and download your final strip.
-                </p>
-
                 <section className="mt-8">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-amoura-muted">
-                      Booth Themes
-                    </h2>
-                    <span className="text-xs text-amoura-muted">
-                      {STRIP_DESIGNS.length} styles
-                    </span>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                     {STRIP_DESIGNS.map((design) => {
                       const active = selectedDesign.id === design.id
 
@@ -505,33 +461,34 @@ export default function ResultClient() {
                         <button
                           key={design.id}
                           onClick={() => setSelectedDesignId(design.id)}
-                          className={`rounded-[1.2rem] border p-3 text-left transition ${
-                            active
-                              ? "border-amoura-red-soft bg-amoura-red/10 shadow-[0_0_30px_rgba(194,31,58,0.14)]"
-                              : "border-amoura-red-soft/15 bg-black/25 hover:border-amoura-red-soft/35"
+                          className={`group text-left transition ${
+                            active ? "scale-[1.02]" : "hover:-translate-y-1"
                           }`}
                         >
-                          <ThemeCardPreview
+                          <ThemePoster
                             design={design}
                             photo={previewPhotos[0]}
                             filter={selectedFilter}
+                            active={active}
                           />
 
-                          <div className="mt-3 flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-amoura-cream">
-                                {design.name}
-                              </p>
-                              <p className="mt-1 line-clamp-2 text-xs leading-4 text-amoura-muted">
-                                {design.subtitle}
-                              </p>
-                            </div>
+                          <div className="mt-4 text-center">
+                            <p className="amoura-serif text-xl font-semibold text-amoura-cream">
+                              {design.name}
+                            </p>
+                            <p className="mx-auto mt-2 max-w-[170px] text-sm leading-5 text-amoura-muted">
+                              {design.subtitle}
+                            </p>
 
-                            {active ? (
-                              <div className="shrink-0 rounded-full border border-amoura-red-soft/30 bg-amoura-red/10 p-1 text-amoura-red-soft">
-                                <Check className="h-3.5 w-3.5" />
-                              </div>
-                            ) : null}
+                            <div className="mt-3 flex justify-center gap-2">
+                              {design.palette.map((color) => (
+                                <span
+                                  key={color}
+                                  className="h-4 w-4 rounded-full border border-white/30"
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                            </div>
                           </div>
                         </button>
                       )
@@ -539,7 +496,7 @@ export default function ResultClient() {
                   </div>
                 </section>
 
-                <section className="mt-8">
+                <section className="mt-10">
                   <div className="mb-4 flex items-center gap-2">
                     <Wand2 className="h-4 w-4 text-amoura-red-soft" />
                     <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-amoura-muted">
@@ -547,7 +504,7 @@ export default function ResultClient() {
                     </h2>
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
                     {FILTERS.map((filter) => {
                       const active = selectedFilter.id === filter.id
 
@@ -579,61 +536,6 @@ export default function ResultClient() {
                       )
                     })}
                   </div>
-                </section>
-
-                <section className="mt-8">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-amoura-red-soft" />
-                      <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-amoura-muted">
-                        Border Fillers
-                      </h2>
-                    </div>
-
-                    <span className="text-xs text-amoura-muted">
-                      {selectedFillers.length}/{MAX_ACTIVE_FILLERS}
-                    </span>
-                  </div>
-
-                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    {FILLERS.map((filler) => {
-                      const active = selectedFillers.includes(filler.id)
-
-                      return (
-                        <button
-                          key={filler.id}
-                          onClick={() => toggleFiller(filler.id)}
-                          className={`rounded-2xl border px-3 py-3 text-left transition ${
-                            active
-                              ? "border-amoura-red-soft bg-amoura-red/10"
-                              : "border-amoura-red-soft/15 bg-black/25 hover:border-amoura-red-soft/35"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="mb-2 text-2xl">
-                                {filler.emoji}
-                              </div>
-                              <p className="truncate text-sm font-semibold text-amoura-cream">
-                                {filler.name}
-                              </p>
-                              <p className="mt-1 line-clamp-2 text-xs text-amoura-muted">
-                                {filler.subtitle}
-                              </p>
-                            </div>
-
-                            {active ? (
-                              <Check className="mt-1 h-4 w-4 shrink-0 text-amoura-red-soft" />
-                            ) : null}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <p className="mt-3 text-xs leading-5 text-amoura-muted">
-                    Fillers decorate the borders automatically. Choose up to 2.
-                  </p>
                 </section>
 
                 <section className="mt-8">
@@ -716,13 +618,11 @@ function PhotostripPreview({
   design,
   filter,
   caption,
-  fillers,
 }: {
   photos: string[]
   design: StripDesign
   filter: FilterOption
   caption: string
-  fillers: string[]
 }) {
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden">
@@ -730,8 +630,7 @@ function PhotostripPreview({
         className={`relative h-full max-h-full w-auto max-w-full overflow-hidden rounded-[1.55rem] border p-3 ${design.backgroundClass} ${design.outerBorderClass}`}
         style={{ aspectRatio: `${STRIP_WIDTH} / ${STRIP_HEIGHT}` }}
       >
-        <PreviewDecorations design={design} />
-        <PreviewFillers fillers={fillers} />
+        <StripDecorations design={design} />
 
         <div className="relative z-10 text-center">
           <p
@@ -750,7 +649,7 @@ function PhotostripPreview({
           {photos.map((photo, index) => (
             <div
               key={`${photo}-${index}`}
-              className={`overflow-hidden rounded-[1rem] border-[4px] bg-black/10 ${design.innerCardClass}`}
+              className={`overflow-hidden rounded-[1rem] border-[4px] bg-black/10 ${design.photoFrameClass}`}
             >
               <img
                 src={photo}
@@ -787,58 +686,44 @@ function PhotostripPreview({
   )
 }
 
-function PreviewFillers({ fillers }: { fillers: string[] }) {
-  const selected = fillers
-    .map((id) => FILLERS.find((item) => item.id === id))
-    .filter(Boolean) as FillerOption[]
-
-  return (
-    <>
-      {selected.flatMap((filler, fillerIndex) =>
-        PREVIEW_FILLER_POINTS.map((point, index) => {
-          const shouldSkip = fillerIndex === 1 && index % 2 === 0
-
-          if (shouldSkip) return null
-
-          return (
-            <span
-              key={`${filler.id}-${index}`}
-              className="pointer-events-none absolute z-20 text-[clamp(0.9rem,0.9vw+0.55rem,1.5rem)] opacity-90 drop-shadow-[0_6px_16px_rgba(0,0,0,0.35)]"
-              style={point}
-            >
-              {filler.emoji}
-            </span>
-          )
-        })
-      )}
-    </>
-  )
-}
-
-function ThemeCardPreview({
+function ThemePoster({
   design,
   photo,
   filter,
+  active,
 }: {
   design: StripDesign
   photo?: string
   filter: FilterOption
+  active: boolean
 }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-[1rem] border p-2 ${design.backgroundClass} ${design.outerBorderClass}`}
+      className={`relative mx-auto aspect-[9/24] w-full max-w-[170px] overflow-hidden rounded-[1.2rem] border p-2.5 transition ${design.backgroundClass} ${
+        active
+          ? "border-amoura-red-soft shadow-[0_0_35px_rgba(194,31,58,0.2)]"
+          : design.outerBorderClass
+      }`}
     >
-      <div className="text-center">
-        <p className={`text-[9px] font-semibold ${design.titleClass}`}>
+      <StripDecorations design={design} small />
+
+      {active ? (
+        <div className="absolute right-2 top-2 z-20 rounded-full border border-amoura-red-soft/40 bg-black/40 p-1 text-amoura-red-soft backdrop-blur">
+          <Check className="h-3.5 w-3.5" />
+        </div>
+      ) : null}
+
+      <div className="relative z-10 text-center">
+        <p className={`text-[10px] font-bold ${design.titleClass}`}>
           {design.brand}
         </p>
       </div>
 
-      <div className="mt-2 grid gap-1.5">
+      <div className="relative z-10 mt-2 grid gap-1.5">
         {[0, 1, 2].map((index) => (
           <div
             key={index}
-            className={`overflow-hidden rounded-md border-[2px] ${design.innerCardClass}`}
+            className={`overflow-hidden rounded-md border-[2px] ${design.photoFrameClass}`}
           >
             {photo ? (
               <img
@@ -854,36 +739,80 @@ function ThemeCardPreview({
         ))}
       </div>
 
-      <div className="mt-2 text-center">
-        <p
-          className={`text-[8px] uppercase tracking-[0.2em] ${design.subtitleClass}`}
-        >
-          {design.accent}
-        </p>
+      <div className="relative z-10 mt-2 text-center">
+        <p className={`text-[10px] ${design.titleClass}`}>{design.accent}</p>
       </div>
     </div>
   )
 }
 
-function PreviewDecorations({ design }: { design: StripDesign }) {
-  if (design.canvas.decoration === "minimal") {
-    return (
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-4 rounded-[1.4rem] border border-black/10" />
-      </div>
-    )
-  }
+function StripDecorations({
+  design,
+  small = false,
+}: {
+  design: StripDesign
+  small?: boolean
+}) {
+  const size = small ? "text-xs" : "text-sm"
 
-  if (design.canvas.decoration === "film") {
+  if (design.canvas.decoration === "vintage") {
     return (
       <div className="pointer-events-none absolute inset-0 opacity-35">
-        <div className="absolute left-2 top-0 h-full w-4 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_9px,transparent_9px,transparent_18px)]" />
-        <div className="absolute right-2 top-0 h-full w-4 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_9px,transparent_9px,transparent_18px)]" />
+        <div className="absolute left-2 top-0 h-full w-3 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_8px,transparent_8px,transparent_17px)]" />
+        <div className="absolute right-2 top-0 h-full w-3 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_8px,transparent_8px,transparent_17px)]" />
       </div>
     )
   }
 
-  return null
+  if (design.canvas.decoration === "barkada") {
+    return (
+      <div className={`pointer-events-none absolute inset-0 opacity-90 ${size}`}>
+        <span className="absolute left-3 top-4">🌼</span>
+        <span className="absolute right-3 top-8">😊</span>
+        <span className="absolute left-2 top-[42%]">🌸</span>
+        <span className="absolute right-2 top-[56%]">🌈</span>
+        <span className="absolute bottom-4 left-3">✿</span>
+        <span className="absolute bottom-4 right-3">🌼</span>
+      </div>
+    )
+  }
+
+  if (design.canvas.decoration === "romance" || design.canvas.decoration === "kawaii") {
+    return (
+      <div className={`pointer-events-none absolute inset-0 opacity-80 ${size}`}>
+        <span className="absolute left-3 top-3">♥</span>
+        <span className="absolute right-3 top-3">♥</span>
+        <span className="absolute left-3 bottom-3">♡</span>
+        <span className="absolute right-3 bottom-3">♡</span>
+      </div>
+    )
+  }
+
+  if (design.canvas.decoration === "midnight" || design.canvas.decoration === "noir") {
+    return (
+      <div className={`pointer-events-none absolute inset-0 opacity-80 ${size}`}>
+        <span className="absolute left-3 top-3">✦</span>
+        <span className="absolute right-3 top-5">☾</span>
+        <span className="absolute left-3 bottom-4">✧</span>
+        <span className="absolute right-3 bottom-3">✦</span>
+      </div>
+    )
+  }
+
+  if (design.canvas.decoration === "retro") {
+    return (
+      <div className={`pointer-events-none absolute inset-0 opacity-80 ${size}`}>
+        <span className="absolute left-3 top-3">★</span>
+        <span className="absolute right-3 top-3">●</span>
+        <span className="absolute left-3 bottom-3">◆</span>
+        <span className="absolute right-3 bottom-3">★</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-4 rounded-[1.2rem] border border-black/10" />
+  )
 }
 
 function CaptionModal({
@@ -965,24 +894,14 @@ async function drawStrip({
   design,
   filter,
   caption,
-  fillers,
 }: {
   ctx: CanvasRenderingContext2D
   photos: string[]
   design: StripDesign
   filter: FilterOption
   caption: string
-  fillers: string[]
 }) {
-  drawRoundedRect(
-    ctx,
-    0,
-    0,
-    STRIP_WIDTH,
-    STRIP_HEIGHT,
-    64,
-    design.canvas.background
-  )
+  drawRoundedRect(ctx, 0, 0, STRIP_WIDTH, STRIP_HEIGHT, 64, design.canvas.background)
 
   drawBorder(
     ctx,
@@ -996,16 +915,15 @@ async function drawStrip({
   )
 
   drawCanvasDecorations(ctx, design)
-  drawCanvasFillers(ctx, fillers)
 
   ctx.textAlign = "center"
   ctx.fillStyle = design.canvas.text
   ctx.font = "bold 54px Georgia, serif"
-  ctx.fillText(design.brand, STRIP_WIDTH / 2, 74)
+  ctx.fillText(design.brand, STRIP_WIDTH / 2, 76)
 
   ctx.fillStyle = design.canvas.mutedText
   ctx.font = "bold 18px Arial, sans-serif"
-  ctx.fillText(design.name.toUpperCase(), STRIP_WIDTH / 2, 108)
+  ctx.fillText(design.name.toUpperCase(), STRIP_WIDTH / 2, 110)
 
   let y = TOP_PADDING
 
@@ -1029,40 +947,25 @@ async function drawStrip({
 
   if (caption) {
     const captionBoxX = 120
-    const captionBoxY = STRIP_HEIGHT - 135
+    const captionBoxY = STRIP_HEIGHT - 138
     const captionBoxWidth = STRIP_WIDTH - 240
-    const captionBoxHeight = 56
+    const captionBoxHeight = 58
 
     ctx.save()
     ctx.globalAlpha = 0.18
-    drawRoundedRect(
-      ctx,
-      captionBoxX,
-      captionBoxY,
-      captionBoxWidth,
-      captionBoxHeight,
-      28,
-      "#000000"
-    )
+    drawRoundedRect(ctx, captionBoxX, captionBoxY, captionBoxWidth, captionBoxHeight, 28, "#000000")
     ctx.restore()
 
     ctx.save()
     ctx.strokeStyle = design.canvas.border
     ctx.lineWidth = 2
-    roundedPath(
-      ctx,
-      captionBoxX,
-      captionBoxY,
-      captionBoxWidth,
-      captionBoxHeight,
-      28
-    )
+    roundedPath(ctx, captionBoxX, captionBoxY, captionBoxWidth, captionBoxHeight, 28)
     ctx.stroke()
     ctx.restore()
 
     ctx.fillStyle = design.canvas.text
     ctx.font = "500 24px Arial, sans-serif"
-    ctx.fillText(caption, STRIP_WIDTH / 2, STRIP_HEIGHT - 98)
+    ctx.fillText(caption, STRIP_WIDTH / 2, STRIP_HEIGHT - 100)
   }
 
   ctx.fillStyle = design.canvas.accent
@@ -1070,78 +973,59 @@ async function drawStrip({
   ctx.fillText(design.accent, STRIP_WIDTH / 2, STRIP_HEIGHT - 42)
 }
 
-function drawCanvasFillers(ctx: CanvasRenderingContext2D, fillers: string[]) {
-  const selected = fillers
-    .map((id) => FILLERS.find((item) => item.id === id))
-    .filter(Boolean) as FillerOption[]
-
-  const points = [
-    { x: 82, y: 150 },
-    { x: STRIP_WIDTH - 82, y: 150 },
-    { x: 72, y: 310 },
-    { x: STRIP_WIDTH - 72, y: 310 },
-    { x: 72, y: 520 },
-    { x: STRIP_WIDTH - 72, y: 520 },
-    { x: 72, y: 750 },
-    { x: STRIP_WIDTH - 72, y: 750 },
-    { x: 72, y: 980 },
-    { x: STRIP_WIDTH - 72, y: 980 },
-    { x: 72, y: 1210 },
-    { x: STRIP_WIDTH - 72, y: 1210 },
-    { x: 92, y: STRIP_HEIGHT - 115 },
-    { x: STRIP_WIDTH - 92, y: STRIP_HEIGHT - 115 },
-  ]
+function drawCanvasDecorations(ctx: CanvasRenderingContext2D, design: StripDesign) {
+  const decoration = design.canvas.decoration
 
   ctx.save()
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
-
-  selected.forEach((filler, fillerIndex) => {
-    points.forEach((point, index) => {
-      if (fillerIndex === 1 && index % 2 === 0) return
-
-      ctx.save()
-      ctx.shadowColor = "rgba(0,0,0,0.25)"
-      ctx.shadowBlur = 14
-      ctx.globalAlpha = 0.92
-      ctx.font = `38px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`
-      ctx.fillText(filler.emoji, point.x, point.y)
-      ctx.restore()
-    })
-  })
-
-  ctx.restore()
-}
-
-function drawCanvasDecorations(
-  ctx: CanvasRenderingContext2D,
-  design: StripDesign
-) {
-  const decoration = design.canvas.decoration
-
-  ctx.save()
   ctx.fillStyle = design.canvas.accent
   ctx.strokeStyle = design.canvas.accent
-  ctx.globalAlpha = 0.45
+  ctx.globalAlpha = 0.75
 
-  if (decoration === "film") {
+  if (decoration === "vintage") {
     ctx.globalAlpha = 0.3
-
     for (let y = 44; y < STRIP_HEIGHT - 44; y += 44) {
       drawRoundedRect(ctx, 34, y, 24, 20, 5, design.canvas.text)
-      drawRoundedRect(
-        ctx,
-        STRIP_WIDTH - 58,
-        y,
-        24,
-        20,
-        5,
-        design.canvas.text
-      )
+      drawRoundedRect(ctx, STRIP_WIDTH - 58, y, 24, 20, 5, design.canvas.text)
     }
   }
 
-  if (decoration === "minimal") {
+  if (decoration === "romance" || decoration === "kawaii") {
+    ctx.font = `34px Georgia, serif`
+    ctx.fillText("♥", 80, 82)
+    ctx.fillText("♥", STRIP_WIDTH - 80, 82)
+    ctx.fillText("♡", 80, STRIP_HEIGHT - 72)
+    ctx.fillText("♡", STRIP_WIDTH - 80, STRIP_HEIGHT - 72)
+  }
+
+  if (decoration === "noir" || decoration === "midnight") {
+    ctx.font = `34px Georgia, serif`
+    ctx.fillText("✦", 80, 82)
+    ctx.fillText("☾", STRIP_WIDTH - 80, 88)
+    ctx.fillText("✧", 80, STRIP_HEIGHT - 72)
+    ctx.fillText("✦", STRIP_WIDTH - 80, STRIP_HEIGHT - 72)
+  }
+
+  if (decoration === "barkada") {
+    ctx.font = `32px Arial`
+    ctx.fillText("🌼", 80, 82)
+    ctx.fillText("😊", STRIP_WIDTH - 80, 90)
+    ctx.fillText("🌸", 76, STRIP_HEIGHT * 0.46)
+    ctx.fillText("🌈", STRIP_WIDTH - 76, STRIP_HEIGHT * 0.56)
+    ctx.fillText("✿", 82, STRIP_HEIGHT - 72)
+    ctx.fillText("🌼", STRIP_WIDTH - 82, STRIP_HEIGHT - 72)
+  }
+
+  if (decoration === "retro") {
+    ctx.font = `34px Georgia, serif`
+    ctx.fillText("★", 80, 82)
+    ctx.fillText("●", STRIP_WIDTH - 80, 82)
+    ctx.fillText("◆", 80, STRIP_HEIGHT - 72)
+    ctx.fillText("★", STRIP_WIDTH - 80, STRIP_HEIGHT - 72)
+  }
+
+  if (decoration === "white") {
     ctx.globalAlpha = 0.16
     ctx.strokeStyle = design.canvas.text
     ctx.lineWidth = 2
