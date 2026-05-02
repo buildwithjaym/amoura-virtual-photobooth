@@ -3,11 +3,26 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
-import { ArrowRight, CheckCircle2, Heart, Loader2, Sparkles, X } from "lucide-react"
+import { Suspense, useEffect, useState } from "react"
+import {
+  ArrowRight,
+  CheckCircle2,
+  Heart,
+  Loader2,
+  Sparkles,
+  X,
+} from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginContent />
+    </Suspense>
+  )
+}
+
+function LoginContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [toast, setToast] = useState<{
     type: "success" | "error"
@@ -24,7 +39,8 @@ export default function LoginPage() {
     if (message === "existing_account") {
       setToast({
         type: "success",
-        message: "You already have an existing account. Please continue by signing in.",
+        message:
+          "You already have an existing account. Please continue by signing in.",
       })
     }
 
@@ -104,7 +120,10 @@ export default function LoginPage() {
           <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-amoura-red-soft/60 to-transparent" />
           <div className="pointer-events-none absolute -top-28 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-amoura-red/20 blur-[90px]" />
 
-          <Link href="/" className="relative z-10 flex flex-col items-center text-center">
+          <Link
+            href="/"
+            className="relative z-10 flex flex-col items-center text-center"
+          >
             <div className="relative mb-4 h-16 w-16 overflow-hidden rounded-full border border-amoura-red-soft/30 bg-black/50 shadow-[0_0_30px_rgba(255,77,109,0.16)]">
               <Image
                 src="/images/amoreframe-og.png"
@@ -135,7 +154,8 @@ export default function LoginPage() {
             </h1>
 
             <p className="mx-auto mt-4 max-w-sm text-sm leading-7 text-amoura-muted sm:text-base">
-              Sign in to access your dashboard, saved photostrips, and booth sessions.
+              Sign in to access your dashboard, saved photostrips, and booth
+              sessions.
             </p>
           </div>
 
@@ -180,10 +200,20 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs leading-6 text-amoura-muted">
-          By continuing, you agree to use AmoreFrame for creating and saving your
-          photobooth memories.
+          By continuing, you agree to use AmoreFrame for creating and saving
+          your photobooth memories.
         </p>
       </section>
+    </main>
+  )
+}
+
+function LoginLoading() {
+  return (
+    <main className="amoura-page flex min-h-screen items-center justify-center px-4">
+      <div className="rounded-2xl border border-amoura-red-soft/20 bg-black/50 px-6 py-5 text-center text-sm text-amoura-muted">
+        Loading login...
+      </div>
     </main>
   )
 }
@@ -198,7 +228,7 @@ function Toast({
   onClose: () => void
 }) {
   return (
-    <div className="fixed left-1/2 top-5 z-[9999] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 animate-in fade-in slide-in-from-top-3 duration-300">
+    <div className="fixed left-1/2 top-5 z-[9999] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
       <div className="flex items-start gap-3 rounded-2xl border border-amoura-red-soft/25 bg-black/85 p-4 text-amoura-cream shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <div
           className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
@@ -212,7 +242,9 @@ function Toast({
 
         <div className="flex-1">
           <p className="text-sm font-semibold">
-            {type === "success" ? "Account already exists" : "Authentication error"}
+            {type === "success"
+              ? "Account already exists"
+              : "Authentication error"}
           </p>
           <p className="mt-1 text-sm leading-6 text-amoura-muted">{message}</p>
         </div>
@@ -247,7 +279,7 @@ function GoogleIcon() {
       />
       <path
         fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38 12 5.38z"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38z"
       />
     </svg>
   )

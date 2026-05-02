@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import {
   Camera,
   Check,
@@ -16,6 +16,14 @@ import {
 import { createClient } from "@/utils/supabase/client"
 
 export default function CreateAccountPage() {
+  return (
+    <Suspense fallback={<CreateAccountLoading />}>
+      <CreateAccountContent />
+    </Suspense>
+  )
+}
+
+function CreateAccountContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [toast, setToast] = useState<{
     type: "success" | "error"
@@ -33,7 +41,8 @@ export default function CreateAccountPage() {
       setToast({
         type: "error",
         title: "Account creation failed",
-        message: "Something went wrong while creating your account. Please try again.",
+        message:
+          "Something went wrong while creating your account. Please try again.",
       })
     }
   }, [error])
@@ -68,7 +77,8 @@ export default function CreateAccountPage() {
         setToast({
           type: "error",
           title: "Google sign-up failed",
-          message: "We could not connect your Google account. Please try again.",
+          message:
+            "We could not connect your Google account. Please try again.",
         })
 
         setIsLoading(false)
@@ -125,7 +135,10 @@ export default function CreateAccountPage() {
           <div className="relative z-10 grid gap-3">
             <FeatureLine icon={Camera} text="Guided photobooth countdowns" />
             <FeatureLine icon={Heart} text="Romantic frames and themes" />
-            <FeatureLine icon={ShieldCheck} text="Memories saved to your account" />
+            <FeatureLine
+              icon={ShieldCheck}
+              text="Memories saved to your account"
+            />
           </div>
         </aside>
 
@@ -194,6 +207,16 @@ export default function CreateAccountPage() {
           </div>
         </section>
       </section>
+    </main>
+  )
+}
+
+function CreateAccountLoading() {
+  return (
+    <main className="amoura-page flex min-h-screen items-center justify-center px-4">
+      <div className="rounded-2xl border border-amoura-red-soft/20 bg-black/50 px-6 py-5 text-center text-sm text-amoura-muted">
+        Loading create account...
+      </div>
     </main>
   )
 }
@@ -311,7 +334,7 @@ function GoogleIcon() {
       />
       <path
         fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38z"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38 12 5.38z"
       />
     </svg>
   )
