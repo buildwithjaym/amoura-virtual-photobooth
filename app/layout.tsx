@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
   display: "swap",
 })
 
-const siteUrl = "https://www.amoreframe.com"
+const siteUrl = "https://www.amoreframephotobooth.site"
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

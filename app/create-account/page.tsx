@@ -20,7 +20,7 @@ export default function CreateAccountPage() {
     try {
       setIsLoading(true)
 
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+      const siteUrl = window.location.origin
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -40,13 +40,13 @@ export default function CreateAccountPage() {
   }
 
   return (
-    <main className="amoura-page relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-6 sm:px-6 lg:px-8">
-      <div className="pointer-events-none absolute right-[-18%] top-[-10%] h-[420px] w-[420px] rounded-full bg-amoura-red/25 blur-[130px]" />
-      <div className="pointer-events-none absolute left-[-18%] bottom-[-12%] h-[320px] w-[320px] rounded-full bg-amoura-red-deep/20 blur-[120px]" />
+    <main className="amoura-page relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-5 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute right-[-20%] top-[-18%] h-[420px] w-[420px] rounded-full bg-amoura-red/25 blur-[130px]" />
+      <div className="pointer-events-none absolute left-[-20%] bottom-[-18%] h-[320px] w-[320px] rounded-full bg-amoura-red-deep/20 blur-[120px]" />
 
-      <section className="relative grid w-full max-w-5xl overflow-hidden rounded-[1.75rem] border border-amoura-red-soft/20 bg-black/45 shadow-[0_0_70px_rgba(194,31,58,0.16)] backdrop-blur-xl lg:grid-cols-[0.95fr_1fr]">
-        <aside className="relative hidden overflow-hidden border-r border-white/5 bg-gradient-to-br from-amoura-red-deep/45 via-black to-black p-8 lg:flex lg:min-h-[560px] lg:flex-col lg:justify-between xl:min-h-[600px]">
-          <div className="absolute right-[-24%] top-[-18%] h-80 w-80 rounded-full bg-amoura-red/25 blur-[90px]" />
+      <section className="relative grid w-full max-w-5xl overflow-hidden rounded-[1.75rem] border border-amoura-red-soft/20 bg-black/45 shadow-[0_0_70px_rgba(194,31,58,0.16)] backdrop-blur-xl lg:grid-cols-[0.9fr_1fr]">
+        <aside className="relative hidden overflow-hidden border-r border-white/5 bg-gradient-to-br from-amoura-red-deep/45 via-black to-black p-8 lg:flex lg:min-h-[540px] lg:flex-col lg:justify-between">
+          <div className="absolute right-[-24%] top-[-20%] h-80 w-80 rounded-full bg-amoura-red/25 blur-[90px]" />
 
           <BrandMark />
 
@@ -56,11 +56,11 @@ export default function CreateAccountPage() {
               Romantic memories, beautifully framed
             </div>
 
-            <h1 className="amoura-serif max-w-lg text-4xl leading-[0.98] text-amoura-cream xl:text-6xl">
+            <h1 className="amoura-serif max-w-lg text-4xl leading-[0.98] text-amoura-cream xl:text-5xl">
               Start your romantic photobooth experience.
             </h1>
 
-            <p className="mt-5 max-w-lg text-base leading-7 text-amoura-muted xl:text-lg xl:leading-8">
+            <p className="mt-5 max-w-lg text-base leading-7 text-amoura-muted">
               Create beautiful photostrips, save your favorite moments, and use
               Dual Mode to capture memories with someone from anywhere.
             </p>
@@ -73,9 +73,9 @@ export default function CreateAccountPage() {
           </div>
         </aside>
 
-        <section className="relative flex min-h-[calc(100vh-3rem)] items-center justify-center p-5 sm:p-8 lg:min-h-[560px] xl:min-h-[600px]">
+        <section className="relative flex min-h-[calc(100vh-2.5rem)] items-center justify-center p-5 sm:p-7 lg:min-h-[540px]">
           <div className="w-full max-w-md">
-            <div className="mb-8 flex justify-center lg:hidden">
+            <div className="mb-7 flex justify-center lg:hidden">
               <BrandMark centered />
             </div>
 
@@ -96,6 +96,7 @@ export default function CreateAccountPage() {
               </div>
 
               <button
+                type="button"
                 onClick={signInWithGoogle}
                 disabled={isLoading}
                 className="mt-7 flex w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white px-6 py-4 text-base font-semibold text-black transition hover:bg-amoura-cream disabled:cursor-not-allowed disabled:opacity-70"
@@ -125,7 +126,7 @@ export default function CreateAccountPage() {
               </p>
             </div>
 
-            <p className="mt-6 text-center text-sm text-amoura-muted">
+            <p className="mt-5 text-center text-sm text-amoura-muted">
               Not ready yet?{" "}
               <Link
                 href="/"

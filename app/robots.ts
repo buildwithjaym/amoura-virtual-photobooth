@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next"
 
 const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL || "https://amoura-virtual-photobooth.vercel.app"
+  process.env.NEXT_PUBLIC_APP_URL || "https://www.amoreframephotobooth.site"
 
 export default function robots(): MetadataRoute.Robots {
   return {
