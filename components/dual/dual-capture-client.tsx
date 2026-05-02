@@ -67,6 +67,7 @@ const MAX_SHOTS = 3
 const CAPTURE_DELAY_MS = 3300
 const DUAL_RESULT_KEY = "amoreframe_dual_photos"
 
+//like a call server
 const rtcConfig: RTCConfiguration = {
   iceServers: [
     {
