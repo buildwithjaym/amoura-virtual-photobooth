@@ -18,7 +18,9 @@ export default async function DualRoomPage({ params }: Props) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect("/create-account")
+    redirect(
+      `/create-account?next=/booth/dual/room/${encodeURIComponent(roomCode)}`
+    )
   }
 
   return <DualRoomClient roomCode={roomCode} />
