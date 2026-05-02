@@ -173,3 +173,175 @@ add constraint dual_rooms_status_check check (
     ]
   )
 );
+
+
+
+
+create table if not exists public.admin_users (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid unique references auth.users(id) on delete cascade,
+  email text unique not null,
+  created_at timestamp with time zone not null default now()
+);
+
+alter table public.admin_users enable row level security;
+
+create policy "Admins can read admin users"
+on public.admin_users
+for select
+to authenticated
+using (user_id = auth.uid());
+
+insert into public.admin_users (user_id, email)
+select id, email
+from auth.users
+where email = 'YOUR_ADMIN_EMAIL_HERE'
+on conflict (email) do nothing;
+
+
+
+create or replace function public.get_admin_dashboard_stats()
+returns json
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  is_admin boolean;
+  result json;
+begin
+  select exists (
+    select 1
+    from public.admin_users
+    where user_id = auth.uid()
+  )
+  into is_admin;
+
+  if not is_admin then
+    raise exception 'Not authorized';
+  end if;
+
+  select json_build_object(
+    'totalUsers', (
+      select count(*)
+      from auth.users
+    ),
+
+    'usersToday', (
+      select count(*)
+      from auth.users
+      where created_at >= date_trunc('day', now())
+    ),
+
+    'usersLast7Days', (
+      select count(*)
+      from auth.users
+      where created_at >= now() - interval '7 days'
+    ),
+
+    'usersLast30Days', (
+      select count(*)
+      from auth.users
+      where created_at >= now() - interval '30 days'
+    ),
+
+    'totalDualRooms', (
+      select count(*)
+      from public.dual_rooms
+    ),
+
+    'dualRoomsToday', (
+      select count(*)
+      from public.dual_rooms
+      where created_at >= date_trunc('day', now())
+    ),
+
+    'dualRoomsLast7Days', (
+      select count(*)
+      from public.dual_rooms
+      where created_at >= now() - interval '7 days'
+    ),
+
+    'completedDualRooms', (
+      select count(*)
+      from public.dual_rooms
+      where status = 'completed'
+    ),
+
+    'activeDualRooms', (
+      select count(*)
+      from public.dual_rooms
+      where status in ('waiting', 'partner_joined', 'ready', 'countdown', 'capturing', 'between_shots')
+    ),
+
+    'totalDualMembers', (
+      select count(*)
+      from public.dual_room_members
+    ),
+
+    'dailyStats', (
+      select coalesce(json_agg(row_to_json(day_stats)), '[]'::json)
+      from (
+        select
+          day::date as date,
+
+          (
+            select count(*)
+            from auth.users u
+            where u.created_at >= day
+              and u.created_at < day + interval '1 day'
+          ) as users,
+
+          (
+            select count(*)
+            from public.dual_rooms dr
+            where dr.created_at >= day
+              and dr.created_at < day + interval '1 day'
+          ) as dualRooms,
+
+          (
+            select count(*)
+            from public.dual_rooms dr
+            where dr.created_at >= day
+              and dr.created_at < day + interval '1 day'
+              and dr.status = 'completed'
+          ) as completedRooms
+
+        from generate_series(
+          date_trunc('day', now()) - interval '6 days',
+          date_trunc('day', now()),
+          interval '1 day'
+        ) day
+        order by day asc
+      ) day_stats
+    ),
+
+    'recentRooms', (
+      select coalesce(json_agg(row_to_json(recent)), '[]'::json)
+      from (
+        select
+          dr.id,
+          dr.room_code,
+          dr.status,
+          dr.current_shot,
+          dr.total_shots,
+          dr.created_at,
+          dr.expires_at,
+          count(drm.id) as members
+        from public.dual_rooms dr
+        left join public.dual_room_members drm
+          on drm.room_id = dr.id
+        group by dr.id
+        order by dr.created_at desc
+        limit 10
+      ) recent
+    )
+  )
+  into result;
+
+  return result;
+end;
+$$;
+
+revoke all on function public.get_admin_dashboard_stats() from public;
+grant execute on function public.get_admin_dashboard_stats() to authenticated;
