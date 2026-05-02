@@ -17,6 +17,7 @@ export type DualRoom = {
   total_shots: number
   current_shot: number
   countdown_starts_at: string | null
+  is_view_swapped: boolean
   created_at: string
   expires_at: string
 }
