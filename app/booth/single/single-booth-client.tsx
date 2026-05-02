@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react"
 
-const MAX_SHOTS = 4
+const MAX_SHOTS = 3
 const STORAGE_KEY = "amoreframe_single_photos"
 
 type CameraPermission = "checking" | "granted" | "prompt" | "denied" | "unsupported"

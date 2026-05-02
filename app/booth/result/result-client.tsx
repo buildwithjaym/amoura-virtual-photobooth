@@ -32,7 +32,7 @@ type StripDesign = {
     text: string
     mutedText: string
     accent: string
-    decoration: "hearts" | "stars" | "film" | "minimal" | "flowers"
+    decoration: "hearts" | "stars" | "film" | "minimal" | "flowers" | "party"
   }
 }
 
@@ -44,29 +44,38 @@ type FilterOption = {
   canvasFilter: string
 }
 
+type FillerOption = {
+  id: string
+  name: string
+  subtitle: string
+  emoji: string
+}
+
 const STORAGE_KEY = "amoreframe_single_photos"
+const MAX_PHOTOS = 3
 const MAX_CAPTION = 50
+const MAX_ACTIVE_FILLERS = 2
 
 const STRIP_WIDTH = 900
 const PHOTO_WIDTH = 760
-const PHOTO_HEIGHT = 540
-const TOP_PADDING = 98
-const GAP = 30
-const BOTTOM_PADDING = 185
+const PHOTO_HEIGHT = 560
+const TOP_PADDING = 112
+const GAP = 38
+const BOTTOM_PADDING = 200
 const STRIP_HEIGHT =
-  TOP_PADDING + PHOTO_HEIGHT * 4 + GAP * 3 + BOTTOM_PADDING
+  TOP_PADDING + PHOTO_HEIGHT * MAX_PHOTOS + GAP * (MAX_PHOTOS - 1) + BOTTOM_PADDING
 
 const STRIP_DESIGNS: StripDesign[] = [
   {
     id: "soft-romance",
     name: "Soft Romance",
-    subtitle: "Sweet, rosy, and made for love.",
+    subtitle: "Pink, sweet, and made for love.",
     brand: "AmoreFrame",
     accent: "♥",
     backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#ffe3ec_0%,#fff7fa_40%,#ffd6e1_100%)]",
+      "bg-[radial-gradient(circle_at_top,#ffe4ee_0%,#fff7fa_42%,#ffd6e3_100%)]",
     outerBorderClass: "border-pink-200/80",
-    innerCardClass: "border-white shadow-[0_14px_35px_rgba(190,24,93,0.14)]",
+    innerCardClass: "border-white shadow-[0_14px_35px_rgba(190,24,93,0.16)]",
     titleClass: "text-rose-900",
     subtitleClass: "text-rose-700",
     canvas: {
@@ -103,25 +112,26 @@ const STRIP_DESIGNS: StripDesign[] = [
     },
   },
   {
-    id: "pure-white",
-    name: "Pure White",
-    subtitle: "Minimal, clean, and timeless.",
+    id: "barkada-fun",
+    name: "Barkada Fun",
+    subtitle: "Colorful, playful, and full of energy.",
     brand: "AmoreFrame",
-    accent: "♡",
+    accent: "✿",
     backgroundClass:
-      "bg-[linear-gradient(to_bottom,#fcfcfb,#f8f7f4,#f4f1ec)]",
-    outerBorderClass: "border-neutral-300/80",
-    innerCardClass: "border-neutral-200 shadow-[0_14px_32px_rgba(0,0,0,0.12)]",
-    titleClass: "text-neutral-900",
-    subtitleClass: "text-neutral-500",
+      "bg-[radial-gradient(circle_at_top,#fff6ab_0%,#fffef1_36%,#ffd49d_100%)]",
+    outerBorderClass: "border-orange-200/80",
+    innerCardClass:
+      "border-white shadow-[0_12px_28px_rgba(234,88,12,0.18)]",
+    titleClass: "text-orange-950",
+    subtitleClass: "text-orange-700",
     canvas: {
-      background: "#fafaf9",
-      border: "#d4d4d4",
-      photoBorder: "#e5e5e5",
-      text: "#171717",
-      mutedText: "#6b7280",
-      accent: "#111827",
-      decoration: "minimal",
+      background: "#fff7d1",
+      border: "#fdba74",
+      photoBorder: "#ffffff",
+      text: "#431407",
+      mutedText: "#c2410c",
+      accent: "#f97316",
+      decoration: "party",
     },
   },
   {
@@ -148,26 +158,25 @@ const STRIP_DESIGNS: StripDesign[] = [
     },
   },
   {
-    id: "barkada-fun",
-    name: "Barkada Fun",
-    subtitle: "Playful, colorful, and full of energy.",
+    id: "pure-white",
+    name: "Pure White",
+    subtitle: "Minimal, clean, and elegant.",
     brand: "AmoreFrame",
-    accent: "✿",
+    accent: "♡",
     backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#fff6ab_0%,#fffef1_36%,#ffd49d_100%)]",
-    outerBorderClass: "border-orange-200/80",
-    innerCardClass:
-      "border-white shadow-[0_12px_28px_rgba(234,88,12,0.18)]",
-    titleClass: "text-orange-950",
-    subtitleClass: "text-orange-700",
+      "bg-[linear-gradient(to_bottom,#fcfcfb,#f8f7f4,#f4f1ec)]",
+    outerBorderClass: "border-neutral-300/80",
+    innerCardClass: "border-neutral-200 shadow-[0_14px_32px_rgba(0,0,0,0.12)]",
+    titleClass: "text-neutral-900",
+    subtitleClass: "text-neutral-500",
     canvas: {
-      background: "#fff7d1",
-      border: "#fdba74",
-      photoBorder: "#ffffff",
-      text: "#431407",
-      mutedText: "#c2410c",
-      accent: "#f97316",
-      decoration: "flowers",
+      background: "#fafaf9",
+      border: "#d4d4d4",
+      photoBorder: "#e5e5e5",
+      text: "#171717",
+      mutedText: "#6b7280",
+      accent: "#111827",
+      decoration: "minimal",
     },
   },
   {
@@ -222,7 +231,7 @@ const FILTERS: FilterOption[] = [
   {
     id: "film",
     name: "B&W Film",
-    subtitle: "Classic monochrome",
+    subtitle: "Classic mono",
     cssFilter: "grayscale(100%) contrast(108%) brightness(102%)",
     canvasFilter: "grayscale(100%) contrast(108%) brightness(102%)",
   },
@@ -235,10 +244,79 @@ const FILTERS: FilterOption[] = [
   },
 ]
 
+const FILLERS: FillerOption[] = [
+  {
+    id: "hearts",
+    name: "Hearts",
+    subtitle: "Romantic border",
+    emoji: "💖",
+  },
+  {
+    id: "tiny-hearts",
+    name: "Tiny Hearts",
+    subtitle: "Soft love pattern",
+    emoji: "💕",
+  },
+  {
+    id: "flowers",
+    name: "Flowers",
+    subtitle: "Sweet romance",
+    emoji: "🌸",
+  },
+  {
+    id: "sparkles",
+    name: "Sparkles",
+    subtitle: "Dreamy shine",
+    emoji: "✨",
+  },
+  {
+    id: "fireworks",
+    name: "Fireworks",
+    subtitle: "Barkada celebration",
+    emoji: "🎆",
+  },
+  {
+    id: "teddy",
+    name: "Teddy Bear",
+    subtitle: "Cute and cozy",
+    emoji: "🧸",
+  },
+  {
+    id: "cat",
+    name: "Cat",
+    subtitle: "Playful cute vibe",
+    emoji: "🐱",
+  },
+  {
+    id: "bow",
+    name: "Bow",
+    subtitle: "Pretty and charming",
+    emoji: "🎀",
+  },
+]
+
+const PREVIEW_FILLER_POINTS = [
+  { top: "5%", left: "6%" },
+  { top: "5%", right: "6%" },
+  { top: "17%", left: "5%" },
+  { top: "17%", right: "5%" },
+  { top: "31%", left: "5%" },
+  { top: "31%", right: "5%" },
+  { top: "45%", left: "5%" },
+  { top: "45%", right: "5%" },
+  { top: "59%", left: "5%" },
+  { top: "59%", right: "5%" },
+  { top: "73%", left: "5%" },
+  { top: "73%", right: "5%" },
+  { bottom: "6%", left: "8%" },
+  { bottom: "6%", right: "8%" },
+]
+
 export default function ResultClient() {
   const [photos, setPhotos] = useState<string[]>([])
   const [selectedDesignId, setSelectedDesignId] = useState("noir-date")
   const [selectedFilterId, setSelectedFilterId] = useState("original")
+  const [selectedFillers, setSelectedFillers] = useState<string[]>(["hearts"])
   const [caption, setCaption] = useState("")
   const [draftCaption, setDraftCaption] = useState("")
   const [isCaptionModalOpen, setIsCaptionModalOpen] = useState(false)
@@ -268,7 +346,7 @@ export default function ResultClient() {
         return
       }
 
-      setPhotos(parsed.slice(0, 4))
+      setPhotos(parsed.slice(0, MAX_PHOTOS))
     } catch {
       window.location.href = "/booth/single"
       return
@@ -277,7 +355,7 @@ export default function ResultClient() {
     }
   }, [])
 
-  const previewPhotos = useMemo(() => photos.slice(0, 4), [photos])
+  const previewPhotos = useMemo(() => photos.slice(0, MAX_PHOTOS), [photos])
 
   function retakePhotos() {
     sessionStorage.removeItem(STORAGE_KEY)
@@ -292,6 +370,20 @@ export default function ResultClient() {
   function saveCaption() {
     setCaption(draftCaption.trim().slice(0, MAX_CAPTION))
     setIsCaptionModalOpen(false)
+  }
+
+  function toggleFiller(id: string) {
+    setSelectedFillers((previous) => {
+      if (previous.includes(id)) {
+        return previous.filter((item) => item !== id)
+      }
+
+      if (previous.length >= MAX_ACTIVE_FILLERS) {
+        return [...previous.slice(1), id]
+      }
+
+      return [...previous, id]
+    })
   }
 
   async function downloadStrip() {
@@ -313,6 +405,7 @@ export default function ResultClient() {
         design: selectedDesign,
         filter: selectedFilter,
         caption,
+        fillers: selectedFillers,
       })
 
       const link = document.createElement("a")
@@ -332,7 +425,9 @@ export default function ResultClient() {
       <main className="amoura-page flex min-h-screen items-center justify-center px-6">
         <div className="text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-amoura-red-soft" />
-          <p className="mt-4 text-amoura-muted">Preparing your strip preview...</p>
+          <p className="mt-4 text-amoura-muted">
+            Preparing your strip preview...
+          </p>
         </div>
       </main>
     )
@@ -342,9 +437,6 @@ export default function ResultClient() {
     <>
       <main className="amoura-page min-h-screen overflow-x-hidden">
         <section className="relative px-4 py-4 sm:px-6 lg:px-8">
-          <div className="pointer-events-none absolute right-[-10%] top-[-8%] h-[280px] w-[280px] rounded-full bg-amoura-red/20 blur-[110px]" />
-          <div className="pointer-events-none absolute left-[-12%] bottom-[-8%] h-[240px] w-[240px] rounded-full bg-amoura-red-deep/20 blur-[100px]" />
-
           <div className="relative mx-auto max-w-7xl">
             <header className="rounded-[1.35rem] border border-amoura-red-soft/20 bg-black/45 px-4 py-3 backdrop-blur-xl sm:px-5">
               <div className="flex items-center justify-between gap-3">
@@ -361,26 +453,25 @@ export default function ResultClient() {
                     Strip Editor
                   </p>
                   <p className="text-xs text-amoura-muted">
-                    Theme, filter, caption, download
+                    Theme, filter, fillers, caption
                   </p>
                 </div>
               </div>
             </header>
 
-            <section className="mt-4 grid gap-4 lg:grid-cols-[minmax(280px,0.85fr)_minmax(400px,1.15fr)]">
-              {/* LEFT PREVIEW */}
+            <section className="mt-4 grid gap-4 lg:grid-cols-[minmax(280px,0.82fr)_minmax(400px,1.18fr)]">
               <section className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-3 backdrop-blur-xl sm:p-5">
-                <div className="flex h-[520px] items-center justify-center sm:h-[620px] lg:h-[calc(100vh-9.5rem)] lg:min-h-[580px] lg:max-h-[760px]">
+                <div className="flex h-[500px] items-center justify-center sm:h-[610px] lg:h-[calc(100vh-9.5rem)] lg:min-h-[540px] lg:max-h-[700px]">
                   <PhotostripPreview
                     photos={previewPhotos}
                     design={selectedDesign}
                     filter={selectedFilter}
                     caption={caption}
+                    fillers={selectedFillers}
                   />
                 </div>
               </section>
 
-              {/* RIGHT CONTROLS */}
               <aside className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-white/[0.035] p-4 sm:p-5 lg:max-h-[calc(100vh-9.5rem)] lg:overflow-y-auto">
                 <div className="inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/25 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-amoura-pink">
                   <Sparkles className="h-4 w-4" />
@@ -392,11 +483,10 @@ export default function ResultClient() {
                 </h1>
 
                 <p className="mt-3 text-sm leading-6 text-amoura-muted">
-                  Pick a premium booth theme, apply a cute filter, add a short
-                  caption, and download your final photostrip.
+                  Pick a booth theme, apply a cute filter, add up to 2 border
+                  fillers, write a short caption, and download your final strip.
                 </p>
 
-                {/* THEMES */}
                 <section className="mt-8">
                   <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-amoura-muted">
@@ -424,6 +514,7 @@ export default function ResultClient() {
                           <ThemeCardPreview
                             design={design}
                             photo={previewPhotos[0]}
+                            filter={selectedFilter}
                           />
 
                           <div className="mt-3 flex items-start justify-between gap-2">
@@ -448,7 +539,6 @@ export default function ResultClient() {
                   </div>
                 </section>
 
-                {/* FILTERS */}
                 <section className="mt-8">
                   <div className="mb-4 flex items-center gap-2">
                     <Wand2 className="h-4 w-4 text-amoura-red-soft" />
@@ -491,7 +581,61 @@ export default function ResultClient() {
                   </div>
                 </section>
 
-                {/* CAPTION */}
+                <section className="mt-8">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-amoura-red-soft" />
+                      <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-amoura-muted">
+                        Border Fillers
+                      </h2>
+                    </div>
+
+                    <span className="text-xs text-amoura-muted">
+                      {selectedFillers.length}/{MAX_ACTIVE_FILLERS}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    {FILLERS.map((filler) => {
+                      const active = selectedFillers.includes(filler.id)
+
+                      return (
+                        <button
+                          key={filler.id}
+                          onClick={() => toggleFiller(filler.id)}
+                          className={`rounded-2xl border px-3 py-3 text-left transition ${
+                            active
+                              ? "border-amoura-red-soft bg-amoura-red/10"
+                              : "border-amoura-red-soft/15 bg-black/25 hover:border-amoura-red-soft/35"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="mb-2 text-2xl">
+                                {filler.emoji}
+                              </div>
+                              <p className="truncate text-sm font-semibold text-amoura-cream">
+                                {filler.name}
+                              </p>
+                              <p className="mt-1 line-clamp-2 text-xs text-amoura-muted">
+                                {filler.subtitle}
+                              </p>
+                            </div>
+
+                            {active ? (
+                              <Check className="mt-1 h-4 w-4 shrink-0 text-amoura-red-soft" />
+                            ) : null}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <p className="mt-3 text-xs leading-5 text-amoura-muted">
+                    Fillers decorate the borders automatically. Choose up to 2.
+                  </p>
+                </section>
+
                 <section className="mt-8">
                   <div className="mb-4 flex items-center gap-2">
                     <MessageCircleHeart className="h-4 w-4 text-amoura-red-soft" />
@@ -522,7 +666,6 @@ export default function ResultClient() {
                   </div>
                 </section>
 
-                {/* ACTIONS */}
                 <section className="mt-8 grid gap-3 border-t border-white/5 pt-5 sm:grid-cols-2">
                   <button
                     onClick={downloadStrip}
@@ -573,11 +716,13 @@ function PhotostripPreview({
   design,
   filter,
   caption,
+  fillers,
 }: {
   photos: string[]
   design: StripDesign
   filter: FilterOption
   caption: string
+  fillers: string[]
 }) {
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden">
@@ -586,9 +731,12 @@ function PhotostripPreview({
         style={{ aspectRatio: `${STRIP_WIDTH} / ${STRIP_HEIGHT}` }}
       >
         <PreviewDecorations design={design} />
+        <PreviewFillers fillers={fillers} />
 
         <div className="relative z-10 text-center">
-          <p className={`text-[clamp(1rem,1vw+0.7rem,1.9rem)] font-bold ${design.titleClass}`}>
+          <p
+            className={`text-[clamp(1rem,1vw+0.7rem,1.9rem)] font-bold ${design.titleClass}`}
+          >
             {design.brand}
           </p>
           <p
@@ -616,7 +764,9 @@ function PhotostripPreview({
 
         {caption ? (
           <div className="relative z-10 mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-center">
-            <p className={`text-[clamp(0.62rem,0.45vw+0.45rem,0.88rem)] ${design.titleClass}`}>
+            <p
+              className={`text-[clamp(0.62rem,0.45vw+0.45rem,0.88rem)] ${design.titleClass}`}
+            >
               {caption}
             </p>
           </div>
@@ -637,12 +787,42 @@ function PhotostripPreview({
   )
 }
 
+function PreviewFillers({ fillers }: { fillers: string[] }) {
+  const selected = fillers
+    .map((id) => FILLERS.find((item) => item.id === id))
+    .filter(Boolean) as FillerOption[]
+
+  return (
+    <>
+      {selected.flatMap((filler, fillerIndex) =>
+        PREVIEW_FILLER_POINTS.map((point, index) => {
+          const shouldSkip = fillerIndex === 1 && index % 2 === 0
+
+          if (shouldSkip) return null
+
+          return (
+            <span
+              key={`${filler.id}-${index}`}
+              className="pointer-events-none absolute z-20 text-[clamp(0.9rem,0.9vw+0.55rem,1.5rem)] opacity-90 drop-shadow-[0_6px_16px_rgba(0,0,0,0.35)]"
+              style={point}
+            >
+              {filler.emoji}
+            </span>
+          )
+        })
+      )}
+    </>
+  )
+}
+
 function ThemeCardPreview({
   design,
   photo,
+  filter,
 }: {
   design: StripDesign
   photo?: string
+  filter: FilterOption
 }) {
   return (
     <div
@@ -665,6 +845,7 @@ function ThemeCardPreview({
                 src={photo}
                 alt=""
                 className="aspect-[4/3] w-full object-cover"
+                style={{ filter: filter.cssFilter }}
               />
             ) : (
               <div className="aspect-[4/3] w-full bg-black/10" />
@@ -674,7 +855,9 @@ function ThemeCardPreview({
       </div>
 
       <div className="mt-2 text-center">
-        <p className={`text-[8px] uppercase tracking-[0.2em] ${design.subtitleClass}`}>
+        <p
+          className={`text-[8px] uppercase tracking-[0.2em] ${design.subtitleClass}`}
+        >
           {design.accent}
         </p>
       </div>
@@ -700,22 +883,7 @@ function PreviewDecorations({ design }: { design: StripDesign }) {
     )
   }
 
-  return (
-    <div className="pointer-events-none absolute inset-0 opacity-70">
-      <span className="absolute left-3 top-3 text-sm">
-        {design.canvas.decoration === "flowers" ? "🌸" : design.accent}
-      </span>
-      <span className="absolute right-3 top-3 text-sm">
-        {design.canvas.decoration === "flowers" ? "🌼" : design.accent}
-      </span>
-      <span className="absolute bottom-3 left-3 text-sm">
-        {design.canvas.decoration === "flowers" ? "🌷" : "✦"}
-      </span>
-      <span className="absolute bottom-3 right-3 text-sm">
-        {design.canvas.decoration === "flowers" ? "🌸" : "♥"}
-      </span>
-    </div>
-  )
+  return null
 }
 
 function CaptionModal({
@@ -731,7 +899,7 @@ function CaptionModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg rounded-[1.6rem] border border-amoura-red-soft/20 bg-[#0b0608] p-5 shadow-2xl sm:p-6">
+      <div className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-[1.6rem] border border-amoura-red-soft/20 bg-[#0b0608] p-5 shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amoura-red-soft">
@@ -765,6 +933,7 @@ function CaptionModal({
             placeholder="For example: My favorite memory ♥"
             className="w-full resize-none rounded-2xl border border-amoura-red-soft/15 bg-black/35 px-4 py-3 text-sm text-amoura-cream outline-none transition placeholder:text-amoura-muted focus:border-amoura-red-soft/45"
           />
+
           <div className="mt-2 text-right text-xs text-amoura-muted">
             {value.length}/{MAX_CAPTION}
           </div>
@@ -777,6 +946,7 @@ function CaptionModal({
           >
             Cancel
           </button>
+
           <button
             onClick={onSave}
             className="amoura-btn-primary rounded-full px-5 py-3 text-sm font-semibold"
@@ -795,12 +965,14 @@ async function drawStrip({
   design,
   filter,
   caption,
+  fillers,
 }: {
   ctx: CanvasRenderingContext2D
   photos: string[]
   design: StripDesign
   filter: FilterOption
   caption: string
+  fillers: string[]
 }) {
   drawRoundedRect(
     ctx,
@@ -824,15 +996,16 @@ async function drawStrip({
   )
 
   drawCanvasDecorations(ctx, design)
+  drawCanvasFillers(ctx, fillers)
 
   ctx.textAlign = "center"
   ctx.fillStyle = design.canvas.text
   ctx.font = "bold 54px Georgia, serif"
-  ctx.fillText(design.brand, STRIP_WIDTH / 2, 68)
+  ctx.fillText(design.brand, STRIP_WIDTH / 2, 74)
 
   ctx.fillStyle = design.canvas.mutedText
   ctx.font = "bold 18px Arial, sans-serif"
-  ctx.fillText(design.name.toUpperCase(), STRIP_WIDTH / 2, 102)
+  ctx.fillText(design.name.toUpperCase(), STRIP_WIDTH / 2, 108)
 
   let y = TOP_PADDING
 
@@ -856,9 +1029,9 @@ async function drawStrip({
 
   if (caption) {
     const captionBoxX = 120
-    const captionBoxY = STRIP_HEIGHT - 130
+    const captionBoxY = STRIP_HEIGHT - 135
     const captionBoxWidth = STRIP_WIDTH - 240
-    const captionBoxHeight = 52
+    const captionBoxHeight = 56
 
     ctx.save()
     ctx.globalAlpha = 0.18
@@ -868,7 +1041,7 @@ async function drawStrip({
       captionBoxY,
       captionBoxWidth,
       captionBoxHeight,
-      26,
+      28,
       "#000000"
     )
     ctx.restore()
@@ -882,19 +1055,62 @@ async function drawStrip({
       captionBoxY,
       captionBoxWidth,
       captionBoxHeight,
-      26
+      28
     )
     ctx.stroke()
     ctx.restore()
 
     ctx.fillStyle = design.canvas.text
     ctx.font = "500 24px Arial, sans-serif"
-    ctx.fillText(caption, STRIP_WIDTH / 2, STRIP_HEIGHT - 96)
+    ctx.fillText(caption, STRIP_WIDTH / 2, STRIP_HEIGHT - 98)
   }
 
   ctx.fillStyle = design.canvas.accent
   ctx.font = "bold 42px Georgia, serif"
   ctx.fillText(design.accent, STRIP_WIDTH / 2, STRIP_HEIGHT - 42)
+}
+
+function drawCanvasFillers(ctx: CanvasRenderingContext2D, fillers: string[]) {
+  const selected = fillers
+    .map((id) => FILLERS.find((item) => item.id === id))
+    .filter(Boolean) as FillerOption[]
+
+  const points = [
+    { x: 82, y: 150 },
+    { x: STRIP_WIDTH - 82, y: 150 },
+    { x: 72, y: 310 },
+    { x: STRIP_WIDTH - 72, y: 310 },
+    { x: 72, y: 520 },
+    { x: STRIP_WIDTH - 72, y: 520 },
+    { x: 72, y: 750 },
+    { x: STRIP_WIDTH - 72, y: 750 },
+    { x: 72, y: 980 },
+    { x: STRIP_WIDTH - 72, y: 980 },
+    { x: 72, y: 1210 },
+    { x: STRIP_WIDTH - 72, y: 1210 },
+    { x: 92, y: STRIP_HEIGHT - 115 },
+    { x: STRIP_WIDTH - 92, y: STRIP_HEIGHT - 115 },
+  ]
+
+  ctx.save()
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+
+  selected.forEach((filler, fillerIndex) => {
+    points.forEach((point, index) => {
+      if (fillerIndex === 1 && index % 2 === 0) return
+
+      ctx.save()
+      ctx.shadowColor = "rgba(0,0,0,0.25)"
+      ctx.shadowBlur = 14
+      ctx.globalAlpha = 0.92
+      ctx.font = `38px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`
+      ctx.fillText(filler.emoji, point.x, point.y)
+      ctx.restore()
+    })
+  })
+
+  ctx.restore()
 }
 
 function drawCanvasDecorations(
@@ -908,22 +1124,9 @@ function drawCanvasDecorations(
   ctx.strokeStyle = design.canvas.accent
   ctx.globalAlpha = 0.45
 
-  if (decoration === "hearts") {
-    drawHeart(ctx, 70, 70, 18)
-    drawHeart(ctx, STRIP_WIDTH - 70, 70, 18)
-    drawHeart(ctx, 70, STRIP_HEIGHT - 70, 18)
-    drawHeart(ctx, STRIP_WIDTH - 70, STRIP_HEIGHT - 70, 18)
-  }
-
-  if (decoration === "stars") {
-    drawStar(ctx, 70, 70, 24)
-    drawStar(ctx, STRIP_WIDTH - 70, 70, 24)
-    drawStar(ctx, 70, STRIP_HEIGHT - 70, 24)
-    drawStar(ctx, STRIP_WIDTH - 70, STRIP_HEIGHT - 70, 24)
-  }
-
   if (decoration === "film") {
     ctx.globalAlpha = 0.3
+
     for (let y = 44; y < STRIP_HEIGHT - 44; y += 44) {
       drawRoundedRect(ctx, 34, y, 24, 20, 5, design.canvas.text)
       drawRoundedRect(
@@ -936,15 +1139,6 @@ function drawCanvasDecorations(
         design.canvas.text
       )
     }
-  }
-
-  if (decoration === "flowers") {
-    ctx.globalAlpha = 0.9
-    ctx.font = "32px Arial"
-    ctx.fillText("🌸", 70, 78)
-    ctx.fillText("🌼", STRIP_WIDTH - 70, 78)
-    ctx.fillText("🌷", 70, STRIP_HEIGHT - 64)
-    ctx.fillText("🌸", STRIP_WIDTH - 70, STRIP_HEIGHT - 64)
   }
 
   if (decoration === "minimal") {
@@ -1089,59 +1283,6 @@ function roundedPath(
   ctx.arcTo(x, y + height, x, y, r)
   ctx.arcTo(x, y, x + width, y, r)
   ctx.closePath()
-}
-
-function drawHeart(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number
-) {
-  ctx.save()
-  ctx.beginPath()
-  ctx.moveTo(x, y + size / 3)
-  ctx.bezierCurveTo(
-    x - size,
-    y - size / 2,
-    x - size * 1.5,
-    y + size / 2,
-    x,
-    y + size * 1.4
-  )
-  ctx.bezierCurveTo(
-    x + size * 1.5,
-    y + size / 2,
-    x + size,
-    y - size / 2,
-    x,
-    y + size / 3
-  )
-  ctx.fill()
-  ctx.restore()
-}
-
-function drawStar(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number
-) {
-  ctx.save()
-  ctx.beginPath()
-
-  for (let i = 0; i < 10; i += 1) {
-    const radius = i % 2 === 0 ? size : size / 2.4
-    const angle = (Math.PI / 5) * i - Math.PI / 2
-    const pointX = x + Math.cos(angle) * radius
-    const pointY = y + Math.sin(angle) * radius
-
-    if (i === 0) ctx.moveTo(pointX, pointY)
-    else ctx.lineTo(pointX, pointY)
-  }
-
-  ctx.closePath()
-  ctx.fill()
-  ctx.restore()
 }
 
 function loadImage(src: string) {

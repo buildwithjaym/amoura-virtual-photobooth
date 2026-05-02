@@ -127,14 +127,14 @@ export default function CreateAccountPage() {
             </div>
 
             <p className="mt-5 text-center text-sm text-amoura-muted">
-              Not ready yet?{" "}
-              <Link
-                href="/"
-                className="font-semibold text-amoura-red-soft transition hover:text-amoura-pink"
-              >
-                Return to home
-              </Link>
-            </p>
+  Already have an account?{" "}
+  <Link
+    href="/login"
+    className="font-semibold text-amoura-red-soft transition hover:text-amoura-pink"
+  >
+    Sign in
+  </Link>
+</p>
           </div>
         </section>
       </section>
