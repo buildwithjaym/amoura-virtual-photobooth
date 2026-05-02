@@ -2,13 +2,49 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useState } from "react"
-import { ArrowRight, Heart, Loader2, Sparkles } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { ArrowRight, CheckCircle2, Heart, Loader2, Sparkles, X } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [toast, setToast] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
+
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  const message = searchParams.get("message")
+  const error = searchParams.get("error")
+
+  useEffect(() => {
+    if (message === "existing_account") {
+      setToast({
+        type: "success",
+        message: "You already have an existing account. Please continue by signing in.",
+      })
+    }
+
+    if (error) {
+      setToast({
+        type: "error",
+        message: "Login failed. Please try again.",
+      })
+    }
+  }, [message, error])
+
+  useEffect(() => {
+    if (!toast) return
+
+    const timer = setTimeout(() => {
+      setToast(null)
+    }, 4500)
+
+    return () => clearTimeout(timer)
+  }, [toast])
 
   async function signInWithGoogle() {
     try {
@@ -20,23 +56,42 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
+          redirectTo: `${siteUrl}/auth/callback?intent=login&next=/dashboard`,
         },
       })
 
       if (error) {
         console.error("Google login error:", error.message)
+
+        setToast({
+          type: "error",
+          message: "Google sign in failed. Please try again.",
+        })
+
         setIsLoading(false)
       }
     } catch (error) {
       console.error("Unexpected login error:", error)
+
+      setToast({
+        type: "error",
+        message: "Something went wrong. Please try again.",
+      })
+
       setIsLoading(false)
     }
   }
 
   return (
     <main className="amoura-page relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8">
-      {/* Background */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
+
       <div className="pointer-events-none absolute left-[-15%] top-[-10%] h-[420px] w-[420px] rounded-full bg-amoura-red/25 blur-[140px]" />
       <div className="pointer-events-none absolute bottom-[-15%] right-[-15%] h-[460px] w-[460px] rounded-full bg-amoura-red-deep/30 blur-[150px]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.035),transparent_48%)]" />
@@ -49,7 +104,6 @@ export default function LoginPage() {
           <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-amoura-red-soft/60 to-transparent" />
           <div className="pointer-events-none absolute -top-28 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-amoura-red/20 blur-[90px]" />
 
-          {/* Logo */}
           <Link href="/" className="relative z-10 flex flex-col items-center text-center">
             <div className="relative mb-4 h-16 w-16 overflow-hidden rounded-full border border-amoura-red-soft/30 bg-black/50 shadow-[0_0_30px_rgba(255,77,109,0.16)]">
               <Image
@@ -70,7 +124,6 @@ export default function LoginPage() {
             </p>
           </Link>
 
-          {/* Content */}
           <div className="relative z-10 mt-10 text-center">
             <div className="mx-auto mb-4 flex w-fit items-center gap-2 rounded-full border border-amoura-red-soft/20 bg-white/[0.04] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-amoura-pink">
               <Heart className="h-3.5 w-3.5" />
@@ -86,7 +139,6 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Login button */}
           <button
             type="button"
             onClick={signInWithGoogle}
@@ -106,7 +158,6 @@ export default function LoginPage() {
             )}
           </button>
 
-          {/* Links */}
           <div className="relative z-10 mt-7 space-y-3 text-center text-sm">
             <p className="text-amoura-muted">
               New to AmoreFrame?{" "}
@@ -134,6 +185,48 @@ export default function LoginPage() {
         </p>
       </section>
     </main>
+  )
+}
+
+function Toast({
+  type,
+  message,
+  onClose,
+}: {
+  type: "success" | "error"
+  message: string
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed left-1/2 top-5 z-[9999] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 animate-in fade-in slide-in-from-top-3 duration-300">
+      <div className="flex items-start gap-3 rounded-2xl border border-amoura-red-soft/25 bg-black/85 p-4 text-amoura-cream shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+        <div
+          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+            type === "success"
+              ? "bg-amoura-red/15 text-amoura-red-soft"
+              : "bg-red-500/15 text-red-300"
+          }`}
+        >
+          <CheckCircle2 className="h-5 w-5" />
+        </div>
+
+        <div className="flex-1">
+          <p className="text-sm font-semibold">
+            {type === "success" ? "Account already exists" : "Authentication error"}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-amoura-muted">{message}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-full p-1 text-amoura-muted transition hover:bg-white/10 hover:text-amoura-cream"
+          aria-label="Close notification"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   )
 }
 

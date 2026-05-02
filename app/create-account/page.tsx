@@ -2,45 +2,101 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
 import {
   Camera,
   Check,
+  CheckCircle2,
   Heart,
   Loader2,
   ShieldCheck,
+  X,
 } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 
 export default function CreateAccountPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [toast, setToast] = useState<{
+    type: "success" | "error"
+    title: string
+    message: string
+  } | null>(null)
+
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  const error = searchParams.get("error")
+
+  useEffect(() => {
+    if (error) {
+      setToast({
+        type: "error",
+        title: "Account creation failed",
+        message: "Something went wrong while creating your account. Please try again.",
+      })
+    }
+  }, [error])
+
+  useEffect(() => {
+    if (!toast) return
+
+    const timer = setTimeout(() => {
+      setToast(null)
+    }, 4500)
+
+    return () => clearTimeout(timer)
+  }, [toast])
 
   async function signInWithGoogle() {
     try {
       setIsLoading(true)
 
-      const siteUrl = window.location.origin
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${siteUrl}/auth/callback?next=/dashboard`,
+          redirectTo: `${siteUrl}/auth/callback?intent=signup&next=/dashboard`,
         },
       })
 
       if (error) {
-        console.error("Google sign-in error:", error.message)
+        console.error("Google sign-up error:", error.message)
+
+        setToast({
+          type: "error",
+          title: "Google sign-up failed",
+          message: "We could not connect your Google account. Please try again.",
+        })
+
         setIsLoading(false)
       }
     } catch (error) {
-      console.error("Unexpected sign-in error:", error)
+      console.error("Unexpected sign-up error:", error)
+
+      setToast({
+        type: "error",
+        title: "Something went wrong",
+        message: "Please try creating your account again.",
+      })
+
       setIsLoading(false)
     }
   }
 
   return (
     <main className="amoura-page relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-5 sm:px-6 lg:px-8">
+      {toast && (
+        <Toast
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
+
       <div className="pointer-events-none absolute right-[-20%] top-[-18%] h-[420px] w-[420px] rounded-full bg-amoura-red/25 blur-[130px]" />
       <div className="pointer-events-none absolute left-[-20%] bottom-[-18%] h-[320px] w-[320px] rounded-full bg-amoura-red-deep/20 blur-[120px]" />
 
@@ -86,12 +142,12 @@ export default function CreateAccountPage() {
                 </p>
 
                 <h2 className="amoura-serif text-4xl leading-tight text-amoura-cream sm:text-5xl">
-                  Continue to AmoreFrame.
+                  Join AmoreFrame.
                 </h2>
 
                 <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-amoura-muted sm:text-base sm:leading-7">
-                  Sign in with Google to save your strips, access your gallery,
-                  and start creating shared memories.
+                  Create your account with Google to save your strips, access
+                  your gallery, and start creating shared memories.
                 </p>
               </div>
 
@@ -104,12 +160,12 @@ export default function CreateAccountPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Connecting...
+                    Creating account...
                   </>
                 ) : (
                   <>
                     <GoogleIcon />
-                    Continue with Google
+                    Create account with Google
                   </>
                 )}
               </button>
@@ -127,18 +183,60 @@ export default function CreateAccountPage() {
             </div>
 
             <p className="mt-5 text-center text-sm text-amoura-muted">
-  Already have an account?{" "}
-  <Link
-    href="/login"
-    className="font-semibold text-amoura-red-soft transition hover:text-amoura-pink"
-  >
-    Sign in
-  </Link>
-</p>
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="font-semibold text-amoura-red-soft transition hover:text-amoura-pink"
+              >
+                Sign in
+              </Link>
+            </p>
           </div>
         </section>
       </section>
     </main>
+  )
+}
+
+function Toast({
+  type,
+  title,
+  message,
+  onClose,
+}: {
+  type: "success" | "error"
+  title: string
+  message: string
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed left-1/2 top-5 z-[9999] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
+      <div className="flex items-start gap-3 rounded-2xl border border-amoura-red-soft/25 bg-black/85 p-4 text-amoura-cream shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+        <div
+          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+            type === "success"
+              ? "bg-amoura-red/15 text-amoura-red-soft"
+              : "bg-red-500/15 text-red-300"
+          }`}
+        >
+          <CheckCircle2 className="h-5 w-5" />
+        </div>
+
+        <div className="flex-1">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="mt-1 text-sm leading-6 text-amoura-muted">{message}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-full p-1 text-amoura-muted transition hover:bg-white/10 hover:text-amoura-cream"
+          aria-label="Close notification"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -213,7 +311,7 @@ function GoogleIcon() {
       />
       <path
         fill="#EA4335"
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38 12 5.38z"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38z"
       />
     </svg>
   )

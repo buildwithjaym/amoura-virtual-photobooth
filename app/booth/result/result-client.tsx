@@ -9,7 +9,6 @@ import {
   Loader2,
   MessageCircleHeart,
   RefreshCcw,
-  Sparkles,
   Wand2,
   X,
 } from "lucide-react"
@@ -64,7 +63,10 @@ const TOP_PADDING = 110
 const GAP = 34
 const BOTTOM_PADDING = 190
 const STRIP_HEIGHT =
-  TOP_PADDING + PHOTO_HEIGHT * MAX_PHOTOS + GAP * (MAX_PHOTOS - 1) + BOTTOM_PADDING
+  TOP_PADDING +
+  PHOTO_HEIGHT * MAX_PHOTOS +
+  GAP * (MAX_PHOTOS - 1) +
+  BOTTOM_PADDING
 
 const STRIP_DESIGNS: StripDesign[] = [
   {
@@ -101,7 +103,8 @@ const STRIP_DESIGNS: StripDesign[] = [
     backgroundClass:
       "bg-[radial-gradient(circle_at_top,#ffe4ee_0%,#fff7fa_42%,#ffd1df_100%)]",
     outerBorderClass: "border-pink-200/90",
-    photoFrameClass: "border-white shadow-[0_14px_35px_rgba(190,24,93,0.16)]",
+    photoFrameClass:
+      "border-white shadow-[0_14px_35px_rgba(190,24,93,0.16)]",
     titleClass: "text-rose-900",
     subtitleClass: "text-rose-700",
     canvas: {
@@ -148,7 +151,8 @@ const STRIP_DESIGNS: StripDesign[] = [
     backgroundClass:
       "bg-[radial-gradient(circle_at_top,#fff6ab_0%,#fffef1_36%,#ffbf83_100%)]",
     outerBorderClass: "border-orange-200/90",
-    photoFrameClass: "border-white shadow-[0_12px_28px_rgba(234,88,12,0.18)]",
+    photoFrameClass:
+      "border-white shadow-[0_12px_28px_rgba(234,88,12,0.18)]",
     titleClass: "text-orange-950",
     subtitleClass: "text-orange-700",
     canvas: {
@@ -171,7 +175,8 @@ const STRIP_DESIGNS: StripDesign[] = [
     backgroundClass:
       "bg-[linear-gradient(to_bottom,#ffffff,#f8f7f4,#f1eee8)]",
     outerBorderClass: "border-neutral-300/90",
-    photoFrameClass: "border-neutral-200 shadow-[0_14px_32px_rgba(0,0,0,0.12)]",
+    photoFrameClass:
+      "border-neutral-200 shadow-[0_14px_32px_rgba(0,0,0,0.12)]",
     titleClass: "text-neutral-900",
     subtitleClass: "text-neutral-500",
     canvas: {
@@ -218,7 +223,8 @@ const STRIP_DESIGNS: StripDesign[] = [
     backgroundClass:
       "bg-[radial-gradient(circle_at_top,#ffd8eb_0%,#fff4fa_45%,#dbe4ff_100%)]",
     outerBorderClass: "border-pink-200/80",
-    photoFrameClass: "border-white shadow-[0_14px_35px_rgba(236,72,153,0.14)]",
+    photoFrameClass:
+      "border-white shadow-[0_14px_35px_rgba(236,72,153,0.14)]",
     titleClass: "text-pink-900",
     subtitleClass: "text-pink-600",
     canvas: {
@@ -241,7 +247,8 @@ const STRIP_DESIGNS: StripDesign[] = [
     backgroundClass:
       "bg-[linear-gradient(135deg,#ffdf6e,#ff8f70_45%,#6ee7b7)]",
     outerBorderClass: "border-yellow-300/70",
-    photoFrameClass: "border-white shadow-[0_12px_30px_rgba(255,91,69,0.2)]",
+    photoFrameClass:
+      "border-white shadow-[0_12px_30px_rgba(255,91,69,0.2)]",
     titleClass: "text-zinc-950",
     subtitleClass: "text-zinc-800",
     canvas: {
@@ -427,9 +434,9 @@ export default function ResultClient() {
               </div>
             </header>
 
-            <section className="mt-4 grid gap-4 lg:grid-cols-[minmax(250px,0.75fr)_minmax(420px,1.25fr)]">
+            <section className="mt-4 grid gap-4 lg:grid-cols-[minmax(230px,0.68fr)_minmax(420px,1.32fr)]">
               <section className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-3 backdrop-blur-xl sm:p-5">
-                <div className="flex h-[470px] items-center justify-center sm:h-[560px] lg:h-[calc(100vh-9.75rem)] lg:min-h-[500px] lg:max-h-[660px]">
+                <div className="flex h-[500px] items-center justify-center sm:h-[590px] lg:h-[calc(100vh-9.75rem)] lg:min-h-[520px] lg:max-h-[680px]">
                   <PhotostripPreview
                     photos={previewPhotos}
                     design={selectedDesign}
@@ -627,34 +634,34 @@ function PhotostripPreview({
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden">
       <div
-        className={`relative h-full max-h-full w-auto max-w-full overflow-hidden rounded-[1.55rem] border p-3 ${design.backgroundClass} ${design.outerBorderClass}`}
+        className={`relative flex h-[96%] max-h-[96%] w-auto max-w-full flex-col overflow-hidden rounded-[1.45rem] border p-2.5 shadow-2xl sm:p-3 ${design.backgroundClass} ${design.outerBorderClass}`}
         style={{ aspectRatio: `${STRIP_WIDTH} / ${STRIP_HEIGHT}` }}
       >
         <StripDecorations design={design} />
 
-        <div className="relative z-10 text-center">
+        <div className="relative z-10 shrink-0 text-center">
           <p
-            className={`text-[clamp(1rem,1vw+0.7rem,1.9rem)] font-bold ${design.titleClass}`}
+            className={`text-[clamp(0.82rem,0.75vw+0.5rem,1.35rem)] font-bold ${design.titleClass}`}
           >
             {design.brand}
           </p>
           <p
-            className={`mt-0.5 text-[clamp(0.48rem,0.35vw+0.35rem,0.72rem)] uppercase tracking-[0.3em] ${design.subtitleClass}`}
+            className={`mt-0.5 text-[0.42rem] uppercase tracking-[0.22em] sm:text-[0.5rem] ${design.subtitleClass}`}
           >
             {design.name}
           </p>
         </div>
 
-        <div className="relative z-10 mt-3 grid gap-2.5">
-          {photos.map((photo, index) => (
+        <div className="relative z-10 mt-2 grid min-h-0 flex-1 grid-rows-3 gap-1.5 sm:gap-2">
+          {photos.slice(0, MAX_PHOTOS).map((photo, index) => (
             <div
               key={`${photo}-${index}`}
-              className={`overflow-hidden rounded-[1rem] border-[4px] bg-black/10 ${design.photoFrameClass}`}
+              className={`min-h-0 overflow-hidden rounded-[0.8rem] border-[3px] bg-black/10 sm:border-[4px] ${design.photoFrameClass}`}
             >
               <img
                 src={photo}
                 alt={`Captured shot ${index + 1}`}
-                className="aspect-[4/3] w-full object-cover"
+                className="h-full w-full object-cover"
                 style={{ filter: filter.cssFilter }}
               />
             </div>
@@ -662,21 +669,19 @@ function PhotostripPreview({
         </div>
 
         {caption ? (
-          <div className="relative z-10 mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-center">
+          <div className="relative z-10 mt-2 shrink-0 rounded-xl border border-white/10 bg-black/20 px-2 py-1.5 text-center">
             <p
-              className={`text-[clamp(0.62rem,0.45vw+0.45rem,0.88rem)] ${design.titleClass}`}
+              className={`truncate text-[0.52rem] leading-3 sm:text-[0.66rem] sm:leading-4 ${design.titleClass}`}
             >
               {caption}
             </p>
           </div>
         ) : null}
 
-        <div className={`relative z-10 mt-3 text-center ${design.titleClass}`}>
-          <p className="text-[clamp(1.1rem,1vw+0.8rem,1.8rem)] leading-none">
-            {design.accent}
-          </p>
+        <div className={`relative z-10 mt-2 shrink-0 text-center ${design.titleClass}`}>
+          <p className="text-base leading-none sm:text-lg">{design.accent}</p>
           <p
-            className={`mt-1 text-[clamp(0.45rem,0.3vw+0.35rem,0.62rem)] uppercase tracking-[0.22em] ${design.subtitleClass}`}
+            className={`mt-0.5 text-[0.38rem] uppercase tracking-[0.16em] sm:text-[0.46rem] ${design.subtitleClass}`}
           >
             Captured with love
           </p>
@@ -777,7 +782,10 @@ function StripDecorations({
     )
   }
 
-  if (design.canvas.decoration === "romance" || design.canvas.decoration === "kawaii") {
+  if (
+    design.canvas.decoration === "romance" ||
+    design.canvas.decoration === "kawaii"
+  ) {
     return (
       <div className={`pointer-events-none absolute inset-0 opacity-80 ${size}`}>
         <span className="absolute left-3 top-3">♥</span>
@@ -788,7 +796,10 @@ function StripDecorations({
     )
   }
 
-  if (design.canvas.decoration === "midnight" || design.canvas.decoration === "noir") {
+  if (
+    design.canvas.decoration === "midnight" ||
+    design.canvas.decoration === "noir"
+  ) {
     return (
       <div className={`pointer-events-none absolute inset-0 opacity-80 ${size}`}>
         <span className="absolute left-3 top-3">✦</span>
@@ -901,7 +912,15 @@ async function drawStrip({
   filter: FilterOption
   caption: string
 }) {
-  drawRoundedRect(ctx, 0, 0, STRIP_WIDTH, STRIP_HEIGHT, 64, design.canvas.background)
+  drawRoundedRect(
+    ctx,
+    0,
+    0,
+    STRIP_WIDTH,
+    STRIP_HEIGHT,
+    64,
+    design.canvas.background
+  )
 
   drawBorder(
     ctx,
@@ -953,13 +972,28 @@ async function drawStrip({
 
     ctx.save()
     ctx.globalAlpha = 0.18
-    drawRoundedRect(ctx, captionBoxX, captionBoxY, captionBoxWidth, captionBoxHeight, 28, "#000000")
+    drawRoundedRect(
+      ctx,
+      captionBoxX,
+      captionBoxY,
+      captionBoxWidth,
+      captionBoxHeight,
+      28,
+      "#000000"
+    )
     ctx.restore()
 
     ctx.save()
     ctx.strokeStyle = design.canvas.border
     ctx.lineWidth = 2
-    roundedPath(ctx, captionBoxX, captionBoxY, captionBoxWidth, captionBoxHeight, 28)
+    roundedPath(
+      ctx,
+      captionBoxX,
+      captionBoxY,
+      captionBoxWidth,
+      captionBoxHeight,
+      28
+    )
     ctx.stroke()
     ctx.restore()
 
@@ -973,7 +1007,10 @@ async function drawStrip({
   ctx.fillText(design.accent, STRIP_WIDTH / 2, STRIP_HEIGHT - 42)
 }
 
-function drawCanvasDecorations(ctx: CanvasRenderingContext2D, design: StripDesign) {
+function drawCanvasDecorations(
+  ctx: CanvasRenderingContext2D,
+  design: StripDesign
+) {
   const decoration = design.canvas.decoration
 
   ctx.save()
@@ -985,6 +1022,7 @@ function drawCanvasDecorations(ctx: CanvasRenderingContext2D, design: StripDesig
 
   if (decoration === "vintage") {
     ctx.globalAlpha = 0.3
+
     for (let y = 44; y < STRIP_HEIGHT - 44; y += 44) {
       drawRoundedRect(ctx, 34, y, 24, 20, 5, design.canvas.text)
       drawRoundedRect(ctx, STRIP_WIDTH - 58, y, 24, 20, 5, design.canvas.text)
