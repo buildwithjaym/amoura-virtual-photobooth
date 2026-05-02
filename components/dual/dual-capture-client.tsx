@@ -48,6 +48,11 @@ type DualResultData = {
   createdAt: string
 }
 
+type ResultPayload = {
+  from: string
+  data: DualResultData
+}
+
 type DisplaySlot = {
   key: "host" | "partner"
   label: string
@@ -59,6 +64,7 @@ type DisplaySlot = {
 }
 
 const MAX_SHOTS = 3
+const CAPTURE_DELAY_MS = 3300
 const DUAL_RESULT_KEY = "amoreframe_dual_photos"
 
 const rtcConfig: RTCConfiguration = {
@@ -96,11 +102,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [captureMessage, setCaptureMessage] = useState("")
   const [capturingShot, setCapturingShot] = useState<number | null>(null)
+  const [flash, setFlash] = useState(false)
 
   const [hostPhotos, setHostPhotos] = useState<string[]>([])
   const [partnerPhotos, setPartnerPhotos] = useState<string[]>([])
   const [error, setError] = useState("")
-  const [isViewSwapped, setIsViewSwapped] = useState(false)
   const [isResultReady, setIsResultReady] = useState(false)
 
   const hostMember = members.find((member) => member.role === "host") ?? null
@@ -112,6 +118,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const isHost = currentRole === "host"
   const partnerOnline = !!partnerMember?.is_connected
   const liveConnected = remoteReady || connectionState === "connected"
+  const isViewSwapped = !!room?.is_view_swapped
 
   const hostName = hostMember?.display_name || "Host"
   const partnerName = partnerMember?.display_name || "Partner"
@@ -576,11 +583,27 @@ export default function DualCaptureClient({ roomCode }: Props) {
     storeCapturedPhoto(payload.role, payload.shot, payload.imageData)
   }
 
+  function saveResultData(data: DualResultData) {
+    sessionStorage.setItem(DUAL_RESULT_KEY, JSON.stringify(data))
+    setIsResultReady(true)
+    setCaptureMessage("All photos are ready. Continue to your strip design.")
+  }
+
+  function handleResultReady(payload: ResultPayload) {
+    if (payload.from === currentUserId) return
+    saveResultData(payload.data)
+  }
+
   async function captureShot(shot: number) {
     if (!currentRole || !channelRef.current) return
 
     setCapturingShot(shot)
     setCaptureMessage("BOOM! Capturing...")
+
+    setFlash(true)
+    window.setTimeout(() => {
+      setFlash(false)
+    }, 180)
 
     const imageData = captureLocalPhoto()
 
@@ -667,7 +690,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       .update({
         status: "countdown",
         current_shot: nextShot,
-        countdown_starts_at: new Date(Date.now() + 4200).toISOString(),
+        countdown_starts_at: new Date().toISOString(),
       })
       .eq("id", room.id)
 
@@ -676,8 +699,33 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
   }
 
+  async function toggleSwapView() {
+    if (!room) return
+
+    const { error: updateError } = await supabase
+      .from("dual_rooms")
+      .update({
+        is_view_swapped: !room.is_view_swapped,
+      })
+      .eq("id", room.id)
+
+    if (updateError) {
+      setError("We could not swap the view. Please try again.")
+    }
+  }
+
   function continueToStripDesign() {
-    if (!isResultReady) return
+    const saved = sessionStorage.getItem(DUAL_RESULT_KEY)
+
+    if (saved) {
+      window.location.href = "/booth/dual/result"
+      return
+    }
+
+    if (hostPhotos.length < MAX_SHOTS || partnerPhotos.length < MAX_SHOTS) {
+      setError("Still waiting for all photos. Please wait a moment.")
+      return
+    }
 
     const data: DualResultData = {
       roomCode,
@@ -688,7 +736,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       createdAt: new Date().toISOString(),
     }
 
-    sessionStorage.setItem(DUAL_RESULT_KEY, JSON.stringify(data))
+    saveResultData(data)
     window.location.href = "/booth/dual/result"
   }
 
@@ -758,6 +806,9 @@ export default function DualCaptureClient({ roomCode }: Props) {
       .on("broadcast", { event: "photo-captured" }, async ({ payload }) => {
         await handlePhotoCaptured(payload as PhotoPayload)
       })
+      .on("broadcast", { event: "result-ready" }, ({ payload }) => {
+        handleResultReady(payload as ResultPayload)
+      })
       .on(
         "postgres_changes",
         {
@@ -816,56 +867,66 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
   useEffect(() => {
     if (!room || room.status !== "countdown") return
-    if (!room.countdown_starts_at || !cameraReady || !currentRole) return
+    if (!cameraReady || !currentRole) return
 
     const shot = room.current_shot
     if (!shot || scheduledShotRef.current === shot) return
 
     scheduledShotRef.current = shot
 
-    const captureAt = new Date(room.countdown_starts_at).getTime()
-    const delay = Math.max(captureAt - Date.now(), 0)
+    setCountdown(3)
 
-    setCountdown(Math.max(Math.ceil((captureAt - Date.now()) / 1000), 0))
-
-    const countdownTimer = window.setInterval(() => {
-      const diff = captureAt - Date.now()
-
-      if (diff <= 0) {
-        setCountdown(0)
-        window.clearInterval(countdownTimer)
-        return
-      }
-
-      setCountdown(Math.ceil(diff / 1000))
-    }, 150)
+    const tickTwo = window.setTimeout(() => setCountdown(2), 1000)
+    const tickOne = window.setTimeout(() => setCountdown(1), 2000)
+    const tickBoom = window.setTimeout(() => setCountdown(0), 3000)
 
     const captureTimer = window.setTimeout(() => {
       captureShot(shot).catch(console.error)
-    }, delay)
+    }, CAPTURE_DELAY_MS)
 
     return () => {
-      window.clearInterval(countdownTimer)
+      window.clearTimeout(tickTwo)
+      window.clearTimeout(tickOne)
+      window.clearTimeout(tickBoom)
       window.clearTimeout(captureTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    room?.status,
-    room?.current_shot,
-    room?.countdown_starts_at,
-    cameraReady,
-    currentRole,
-  ])
+  }, [room?.status, room?.current_shot, cameraReady, currentRole])
 
   useEffect(() => {
     const ready =
       hostPhotos.length >= MAX_SHOTS && partnerPhotos.length >= MAX_SHOTS
 
-    if (!ready) return
+    if (!ready || isResultReady) return
 
-    setIsResultReady(true)
-    setCaptureMessage("All photos are ready. Continue to your strip design.")
-  }, [hostPhotos, partnerPhotos])
+    const data: DualResultData = {
+      roomCode,
+      hostName,
+      partnerName,
+      hostPhotos: hostPhotos.slice(0, MAX_SHOTS),
+      partnerPhotos: partnerPhotos.slice(0, MAX_SHOTS),
+      createdAt: new Date().toISOString(),
+    }
+
+    saveResultData(data)
+
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "result-ready",
+      payload: {
+        from: currentUserId,
+        data,
+      } satisfies ResultPayload,
+    })
+  }, [
+    hostPhotos,
+    partnerPhotos,
+    roomCode,
+    hostName,
+    partnerName,
+    currentUserId,
+    isResultReady,
+  ])
 
   if (loading) {
     return (
@@ -929,7 +990,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setIsViewSwapped((current) => !current)}
+              onClick={toggleSwapView}
               className="rounded-full border border-amoura-red-soft/20 bg-black/30 px-3 py-2 text-[10px] font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45 sm:text-xs"
             >
               Swap
@@ -980,6 +1041,10 @@ export default function DualCaptureClient({ roomCode }: Props) {
             error={error}
             isResultReady={isResultReady}
           />
+
+          {flash ? (
+            <div className="pointer-events-none absolute inset-0 z-30 bg-white/80" />
+          ) : null}
         </section>
 
         <footer className="shrink-0 rounded-[1.25rem] border border-amoura-red-soft/20 bg-black/55 p-3 backdrop-blur-xl">
