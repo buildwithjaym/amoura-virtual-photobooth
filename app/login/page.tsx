@@ -73,6 +73,9 @@ function LoginContent() {
         provider: "google",
         options: {
           redirectTo: `${siteUrl}/auth/callback?intent=login&next=/dashboard`,
+          queryParams: {
+            prompt: "select_account",
+          },
         },
       })
 
