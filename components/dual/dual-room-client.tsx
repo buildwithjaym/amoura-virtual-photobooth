@@ -1,7 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react"
 import {
   ArrowLeft,
   Camera,
@@ -23,7 +30,11 @@ import {
   getInviteLink,
   getTimeLeft,
 } from "@/lib/dual/helpers"
-import type { DualRoom, DualRoomMember, DualRoomMemberRole } from "@/lib/dual/types"
+import type {
+  DualRoom,
+  DualRoomMember,
+  DualRoomMemberRole,
+} from "@/lib/dual/types"
 
 type Props = {
   roomCode: string
@@ -36,9 +47,19 @@ type SignalPayload = {
   candidate?: RTCIceCandidateInit
 }
 
+type PhotoPayload = {
+  from: string
+  role: DualRoomMemberRole
+  shot: number
+  imageData: string
+}
+
 const rtcConfig: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 }
+
+const MAX_DUAL_SHOTS = 3
+const DUAL_RESULT_KEY = "amoreframe_dual_photos"
 
 export default function DualRoomClient({ roomCode }: Props) {
   const supabase = createClient()
@@ -49,29 +70,40 @@ export default function DualRoomClient({ roomCode }: Props) {
   const remoteStreamRef = useRef<MediaStream | null>(null)
   const peerRef = useRef<RTCPeerConnection | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
   const madeOfferRef = useRef(false)
+  const scheduledShotRef = useRef<number | null>(null)
+  const hostPhotosRef = useRef<string[]>([])
+  const partnerPhotosRef = useRef<string[]>([])
 
   const [room, setRoom] = useState<DualRoom | null>(null)
   const [members, setMembers] = useState<DualRoomMember[]>([])
   const [currentUserId, setCurrentUserId] = useState("")
   const [currentRole, setCurrentRole] = useState<DualRoomMemberRole | null>(null)
   const [loading, setLoading] = useState(true)
+
   const [cameraReady, setCameraReady] = useState(false)
+  const [remoteCameraReady, setRemoteCameraReady] = useState(false)
   const [remoteReady, setRemoteReady] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [error, setError] = useState("")
   const [connectionState, setConnectionState] =
     useState<RTCPeerConnectionState>("new")
+
+  const [capturingShot, setCapturingShot] = useState<number | null>(null)
+  const [hostPhotos, setHostPhotos] = useState<string[]>([])
+  const [partnerPhotos, setPartnerPhotos] = useState<string[]>([])
+
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState("")
 
   const inviteLink = useMemo(() => getInviteLink(roomCode), [roomCode])
 
   const hostMember = members.find((member) => member.role === "host") ?? null
   const partnerMember = members.find((member) => member.role === "partner") ?? null
 
-  const isHost = currentRole === "host"
   const currentMember =
     members.find((member) => member.user_id === currentUserId) ?? null
 
+  const isHost = currentRole === "host"
   const bothReady = !!hostMember?.is_ready && !!partnerMember?.is_ready
   const timeLeft = room ? getTimeLeft(room.expires_at) : "00:00"
   const countdown = getCountdownSeconds(room?.countdown_starts_at ?? null)
@@ -180,13 +212,6 @@ export default function DualRoomClient({ roomCode }: Props) {
           })
 
         if (insertError) throw insertError
-
-        if (role === "partner") {
-          await supabase
-            .from("dual_rooms")
-            .update({ status: "partner_joined" })
-            .eq("id", roomData.id)
-        }
       }
 
       setCurrentRole(role)
@@ -197,6 +222,19 @@ export default function DualRoomClient({ roomCode }: Props) {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function broadcastCameraReady() {
+    if (!channelRef.current || !currentRole) return
+
+    await channelRef.current.send({
+      type: "broadcast",
+      event: "camera-ready",
+      payload: {
+        from: currentUserId,
+        role: currentRole,
+      },
+    })
   }
 
   async function startCamera() {
@@ -225,6 +263,10 @@ export default function DualRoomClient({ roomCode }: Props) {
           peerRef.current?.addTrack(track, stream)
         })
       }
+
+      setTimeout(() => {
+        broadcastCameraReady().catch(console.error)
+      }, 400)
     } catch (err) {
       console.error(err)
       setCameraReady(false)
@@ -279,7 +321,7 @@ export default function DualRoomClient({ roomCode }: Props) {
 
   async function makeOffer() {
     if (!channelRef.current || !currentRole || madeOfferRef.current) return
-    if (!isHost || !partnerMember || !cameraReady) return
+    if (!isHost || !partnerMember || !cameraReady || !remoteCameraReady) return
 
     const peer = createPeer()
     madeOfferRef.current = true
@@ -300,7 +342,7 @@ export default function DualRoomClient({ roomCode }: Props) {
 
   async function handleOffer(payload: SignalPayload) {
     if (payload.from === currentUserId || !payload.sdp || !currentRole) return
-    if (currentRole !== "partner") return
+    if (currentRole !== "partner" || !cameraReady) return
 
     const peer = createPeer()
 
@@ -338,6 +380,119 @@ export default function DualRoomClient({ roomCode }: Props) {
     }
   }
 
+  function storeCapturedPhoto(role: DualRoomMemberRole, shot: number, imageData: string) {
+    const index = shot - 1
+
+    if (role === "host") {
+      const next = [...hostPhotosRef.current]
+      next[index] = imageData
+      hostPhotosRef.current = next.filter(Boolean)
+      setHostPhotos([...hostPhotosRef.current])
+    } else {
+      const next = [...partnerPhotosRef.current]
+      next[index] = imageData
+      partnerPhotosRef.current = next.filter(Boolean)
+      setPartnerPhotos([...partnerPhotosRef.current])
+    }
+  }
+
+  async function handlePhotoCaptured(payload: PhotoPayload) {
+    if (payload.from === currentUserId) return
+
+    storeCapturedPhoto(payload.role, payload.shot, payload.imageData)
+  }
+
+  function captureLocalPhoto() {
+    const video = localVideoRef.current
+    if (!video || video.readyState < 2) return null
+
+    const canvas = document.createElement("canvas")
+    canvas.width = 720
+    canvas.height = 540
+
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return null
+
+    const videoRatio = video.videoWidth / video.videoHeight
+    const canvasRatio = canvas.width / canvas.height
+
+    let sx = 0
+    let sy = 0
+    let sw = video.videoWidth
+    let sh = video.videoHeight
+
+    if (videoRatio > canvasRatio) {
+      sw = video.videoHeight * canvasRatio
+      sx = (video.videoWidth - sw) / 2
+    } else {
+      sh = video.videoWidth / canvasRatio
+      sy = (video.videoHeight - sh) / 2
+    }
+
+    ctx.save()
+    ctx.translate(canvas.width, 0)
+    ctx.scale(-1, 1)
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+    ctx.restore()
+
+    return canvas.toDataURL("image/jpeg", 0.82)
+  }
+
+  async function captureShot(shot: number) {
+    if (!currentRole || !channelRef.current) return
+
+    setCapturingShot(shot)
+
+    const imageData = captureLocalPhoto()
+
+    if (!imageData) {
+      setError("We could not capture your photo. Please keep your camera open.")
+      setCapturingShot(null)
+      return
+    }
+
+    storeCapturedPhoto(currentRole, shot, imageData)
+
+    await channelRef.current.send({
+      type: "broadcast",
+      event: "photo-captured",
+      payload: {
+        from: currentUserId,
+        role: currentRole,
+        shot,
+        imageData,
+      } satisfies PhotoPayload,
+    })
+
+    setTimeout(() => {
+      setCapturingShot(null)
+    }, 700)
+
+    if (isHost && room) {
+      setTimeout(async () => {
+        if (shot < MAX_DUAL_SHOTS) {
+          await supabase
+            .from("dual_rooms")
+            .update({
+              status: "countdown",
+              current_shot: shot + 1,
+              countdown_starts_at: new Date(Date.now() + 4200).toISOString(),
+            })
+            .eq("id", room.id)
+        } else {
+          await supabase
+            .from("dual_rooms")
+            .update({
+              status: "completed",
+              current_shot: MAX_DUAL_SHOTS,
+              countdown_starts_at: null,
+            })
+            .eq("id", room.id)
+        }
+      }, 1500)
+    }
+  }
+
   useEffect(() => {
     ensureJoined()
 
@@ -357,21 +512,23 @@ export default function DualRoomClient({ roomCode }: Props) {
 
     const channel = supabase
       .channel(`dual-room-${room.id}`)
-      .on(
-        "broadcast",
-        { event: "webrtc-offer" },
-        async ({ payload }) => handleOffer(payload as SignalPayload)
-      )
-      .on(
-        "broadcast",
-        { event: "webrtc-answer" },
-        async ({ payload }) => handleAnswer(payload as SignalPayload)
-      )
-      .on(
-        "broadcast",
-        { event: "webrtc-ice" },
-        async ({ payload }) => handleIce(payload as SignalPayload)
-      )
+      .on("broadcast", { event: "camera-ready" }, ({ payload }) => {
+        if (payload?.from !== currentUserId) {
+          setRemoteCameraReady(true)
+        }
+      })
+      .on("broadcast", { event: "webrtc-offer" }, async ({ payload }) => {
+        await handleOffer(payload as SignalPayload)
+      })
+      .on("broadcast", { event: "webrtc-answer" }, async ({ payload }) => {
+        await handleAnswer(payload as SignalPayload)
+      })
+      .on("broadcast", { event: "webrtc-ice" }, async ({ payload }) => {
+        await handleIce(payload as SignalPayload)
+      })
+      .on("broadcast", { event: "photo-captured" }, async ({ payload }) => {
+        await handlePhotoCaptured(payload as PhotoPayload)
+      })
       .on(
         "postgres_changes",
         {
@@ -408,18 +565,64 @@ export default function DualRoomClient({ roomCode }: Props) {
   }, [room?.id, currentUserId, currentRole, cameraReady])
 
   useEffect(() => {
-    if (!isHost || !partnerMember || !cameraReady || !channelRef.current) return
+    if (cameraReady && partnerMember) {
+      broadcastCameraReady().catch(console.error)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraReady, partnerMember?.id])
+
+  useEffect(() => {
+    if (!isHost || !partnerMember || !cameraReady || !remoteCameraReady) return
 
     const timer = window.setTimeout(() => {
       makeOffer().catch((err) => {
         console.error(err)
         setError("We couldn’t connect the live preview.")
       })
-    }, 700)
+    }, 800)
 
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHost, partnerMember?.id, cameraReady, currentRole])
+  }, [isHost, partnerMember?.id, cameraReady, remoteCameraReady])
+
+  useEffect(() => {
+    if (!room || room.status !== "countdown") return
+    if (!room.countdown_starts_at || !cameraReady || !currentRole) return
+
+    const shot = room.current_shot
+    if (!shot || scheduledShotRef.current === shot) return
+
+    scheduledShotRef.current = shot
+
+    const captureAt = new Date(room.countdown_starts_at).getTime()
+    const delay = Math.max(captureAt - Date.now(), 0)
+
+    const timer = window.setTimeout(() => {
+      captureShot(shot).catch(console.error)
+    }, delay)
+
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.status, room?.current_shot, room?.countdown_starts_at, cameraReady, currentRole])
+
+  useEffect(() => {
+    const ready =
+      hostPhotos.length >= MAX_DUAL_SHOTS && partnerPhotos.length >= MAX_DUAL_SHOTS
+
+    if (!ready) return
+
+    const data = {
+      roomCode,
+      hostName: hostMember?.display_name || "Host",
+      partnerName: partnerMember?.display_name || "Partner",
+      hostPhotos: hostPhotos.slice(0, MAX_DUAL_SHOTS),
+      partnerPhotos: partnerPhotos.slice(0, MAX_DUAL_SHOTS),
+      createdAt: new Date().toISOString(),
+    }
+
+    sessionStorage.setItem(DUAL_RESULT_KEY, JSON.stringify(data))
+    window.location.href = "/booth/dual/result"
+  }, [hostPhotos, partnerPhotos, roomCode, hostMember, partnerMember])
 
   async function copyLink() {
     try {
@@ -449,13 +652,13 @@ export default function DualRoomClient({ roomCode }: Props) {
     if (!room || !isHost || !bothReady) return
 
     try {
-      const countdownAt = new Date(Date.now() + 5000).toISOString()
+      scheduledShotRef.current = null
 
       await supabase
         .from("dual_rooms")
         .update({
           status: "countdown",
-          countdown_starts_at: countdownAt,
+          countdown_starts_at: new Date(Date.now() + 5000).toISOString(),
           current_shot: 1,
         })
         .eq("id", room.id)
@@ -544,14 +747,22 @@ export default function DualRoomClient({ roomCode }: Props) {
           </div>
         </header>
 
-        {countdown !== null && room.status === "countdown" ? (
+        {room.status === "countdown" && countdown !== null ? (
           <div className="mt-4 rounded-[1.5rem] border border-amoura-red-soft/25 bg-amoura-red/10 px-5 py-4 text-center backdrop-blur-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amoura-red-soft">
-              Synced countdown
+              Shot {room.current_shot} of {MAX_DUAL_SHOTS}
             </p>
             <div className="amoura-serif mt-2 animate-pulse text-5xl text-amoura-cream">
               {countdown > 0 ? countdown : "Smile!"}
             </div>
+          </div>
+        ) : null}
+
+        {capturingShot ? (
+          <div className="mt-4 rounded-[1.5rem] border border-amoura-red-soft/25 bg-black/45 px-5 py-4 text-center backdrop-blur-xl">
+            <p className="text-sm font-semibold text-amoura-cream">
+              Captured shot {capturingShot}. Preparing next pose...
+            </p>
           </div>
         ) : null}
 
@@ -608,7 +819,7 @@ export default function DualRoomClient({ roomCode }: Props) {
               />
             </div>
 
-            <div className="mt-4 rounded-2xl border border-amoura-red-soft/15 bg-black/30 px-4 py-4 text-sm text-amoura-cream break-all">
+            <div className="mt-4 break-all rounded-2xl border border-amoura-red-soft/15 bg-black/30 px-4 py-4 text-sm text-amoura-cream">
               {inviteLink}
             </div>
           </section>
@@ -624,8 +835,8 @@ export default function DualRoomClient({ roomCode }: Props) {
             </h2>
 
             <p className="mt-3 text-sm leading-7 text-amoura-muted">
-              Both of you can see each other first. When both are ready, the host
-              can start the synced countdown.
+              See each other first, decide your pose, then start the synced
+              countdown for 3 dual shots.
             </p>
 
             <div className="mt-6 space-y-3">
@@ -637,6 +848,13 @@ export default function DualRoomClient({ roomCode }: Props) {
               />
               <StatusRow label="Host ready" value={!!hostMember?.is_ready} />
               <StatusRow label="Partner ready" value={!!partnerMember?.is_ready} />
+              <StatusRow
+                label="Photos captured"
+                value={
+                  hostPhotos.length >= MAX_DUAL_SHOTS &&
+                  partnerPhotos.length >= MAX_DUAL_SHOTS
+                }
+              />
             </div>
 
             {error ? (
@@ -681,11 +899,11 @@ export default function DualRoomClient({ roomCode }: Props) {
               {isHost ? (
                 <button
                   onClick={startSession}
-                  disabled={!bothReady}
+                  disabled={!bothReady || !cameraReady || !remoteReady}
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/30 px-5 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
-                  Start Countdown
+                  Start 3-Shot Countdown
                 </button>
               ) : (
                 <div className="rounded-2xl border border-amoura-red-soft/15 bg-black/30 px-4 py-4 text-sm text-amoura-muted">
@@ -723,7 +941,7 @@ function VideoCard({
   name: string
   ready: boolean
   connected: boolean
-  videoRef: React.RefObject<HTMLVideoElement | null>
+  videoRef: RefObject<HTMLVideoElement | null>
   isLocal?: boolean
   waiting?: boolean
   cameraReady: boolean
@@ -741,7 +959,9 @@ function VideoCard({
 
         <div
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            ready ? "bg-emerald-500/10 text-emerald-300" : "bg-zinc-500/10 text-zinc-300"
+            ready
+              ? "bg-emerald-500/10 text-emerald-300"
+              : "bg-zinc-500/10 text-zinc-300"
           }`}
         >
           {ready ? "Ready" : "Not ready"}
@@ -819,10 +1039,16 @@ function StatusRow({ label, value }: { label: string; value: boolean }) {
       <p className="text-sm text-amoura-muted">{label}</p>
       <span
         className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-          value ? "bg-emerald-500/10 text-emerald-300" : "bg-zinc-500/10 text-zinc-300"
+          value
+            ? "bg-emerald-500/10 text-emerald-300"
+            : "bg-zinc-500/10 text-zinc-300"
         }`}
       >
-        <span className={`h-2 w-2 rounded-full ${value ? "bg-emerald-400" : "bg-zinc-400"}`} />
+        <span
+          className={`h-2 w-2 rounded-full ${
+            value ? "bg-emerald-400" : "bg-zinc-400"
+          }`}
+        />
         {value ? "Yes" : "No"}
       </span>
     </div>
