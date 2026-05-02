@@ -12,6 +12,7 @@ export default async function DualRoomPage({ params }: Props) {
   const { roomCode } = await params
 
   const supabase = await createClient()
+
   const {
     data: { user },
   } = await supabase.auth.getUser()

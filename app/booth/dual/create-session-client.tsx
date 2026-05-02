@@ -65,27 +65,25 @@ export default function CreateSessionClient({ displayName }: Props) {
         .select()
         .single()
 
-      if (roomError) {
-        throw roomError
-      }
+      if (roomError) throw roomError
 
       const hostName = getDisplayName({
         email: user.email,
         user_metadata: user.user_metadata ?? {},
       })
 
-      const { error: memberError } = await supabase.from("dual_room_members").insert({
-        room_id: room.id,
-        user_id: user.id,
-        role: "host",
-        display_name: hostName,
-        is_ready: false,
-        is_connected: true,
-      })
+      const { error: memberError } = await supabase
+        .from("dual_room_members")
+        .insert({
+          room_id: room.id,
+          user_id: user.id,
+          role: "host",
+          display_name: hostName,
+          is_ready: false,
+          is_connected: true,
+        })
 
-      if (memberError) {
-        throw memberError
-      }
+      if (memberError) throw memberError
 
       setRoomCode(newRoomCode)
     } catch (err) {
@@ -114,8 +112,8 @@ export default function CreateSessionClient({ displayName }: Props) {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: "Join my Amoura dual photobooth session",
-          text: "Join me on Amoura and let’s capture memories together.",
+          title: "Join my AmoreFrame dual photobooth session",
+          text: "Join me on AmoreFrame and let’s capture memories together.",
           url: inviteLink,
         })
         return
@@ -123,7 +121,7 @@ export default function CreateSessionClient({ displayName }: Props) {
 
       await copyLink()
     } catch {
-      // ignore user-cancelled share
+      // User cancelled share.
     }
   }
 
@@ -165,41 +163,23 @@ export default function CreateSessionClient({ displayName }: Props) {
             </h1>
 
             <p className="mt-4 max-w-xl text-base leading-7 text-amoura-muted">
-              Hi <span className="text-amoura-cream">{displayName}</span>, create a
-              private room, copy your invite link, and let your partner join. Once
-              both of you are ready, you’ll capture the session side by side.
+              Hi <span className="text-amoura-cream">{displayName}</span>, create
+              a private room, copy your invite link, and let your partner join.
+              You will both see each other live before taking photos.
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-amoura-red-soft/15 bg-black/30 p-4">
-                <div className="mb-3 inline-flex rounded-full bg-amoura-red/10 p-2 text-amoura-red-soft">
-                  <Link2 className="h-4 w-4" />
-                </div>
-                <p className="text-sm font-semibold text-amoura-cream">Create link</p>
-                <p className="mt-1 text-sm leading-6 text-amoura-muted">
-                  Generate a private session link in one tap.
-                </p>
-              </div>
+              <InfoCard icon={<Link2 className="h-4 w-4" />} title="Copy link">
+                Generate one private session link.
+              </InfoCard>
 
-              <div className="rounded-2xl border border-amoura-red-soft/15 bg-black/30 p-4">
-                <div className="mb-3 inline-flex rounded-full bg-amoura-red/10 p-2 text-amoura-red-soft">
-                  <Users className="h-4 w-4" />
-                </div>
-                <p className="text-sm font-semibold text-amoura-cream">Wait together</p>
-                <p className="mt-1 text-sm leading-6 text-amoura-muted">
-                  See when your partner joins and becomes ready.
-                </p>
-              </div>
+              <InfoCard icon={<Users className="h-4 w-4" />} title="See partner">
+                Both cameras appear side by side.
+              </InfoCard>
 
-              <div className="rounded-2xl border border-amoura-red-soft/15 bg-black/30 p-4">
-                <div className="mb-3 inline-flex rounded-full bg-amoura-red/10 p-2 text-amoura-red-soft">
-                  <Heart className="h-4 w-4" />
-                </div>
-                <p className="text-sm font-semibold text-amoura-cream">Capture synced</p>
-                <p className="mt-1 text-sm leading-6 text-amoura-muted">
-                  Countdown and photos will be synced in the same room.
-                </p>
-              </div>
+              <InfoCard icon={<Heart className="h-4 w-4" />} title="Pose together">
+                Get ready before the countdown starts.
+              </InfoCard>
             </div>
           </section>
 
@@ -213,7 +193,7 @@ export default function CreateSessionClient({ displayName }: Props) {
                     ) : (
                       <Send className="h-5 w-5" />
                     )}
-                    <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-amoura-red-soft animate-pulse" />
+                    <span className="absolute -right-1 -top-1 h-3 w-3 animate-pulse rounded-full bg-amoura-red-soft" />
                   </div>
 
                   <div>
@@ -221,15 +201,15 @@ export default function CreateSessionClient({ displayName }: Props) {
                       Create Session
                     </p>
                     <p className="text-sm text-amoura-muted">
-                      Your room will expire after 30 minutes
+                      Your room expires after 30 minutes
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-6 rounded-2xl border border-amoura-red-soft/15 bg-black/35 p-5">
                   <p className="text-sm leading-7 text-amoura-muted">
-                    Best for couples, friends, and long-distance memories. We’ll
-                    generate one room and give you a clean invite link to share.
+                    Create a private room and send the link to your partner. No
+                    final photo is stored. The session is only for live syncing.
                   </p>
 
                   <button
@@ -257,88 +237,104 @@ export default function CreateSessionClient({ displayName }: Props) {
                     </div>
                   ) : null}
 
-                  {error ? (
-                    <p className="mt-4 text-sm text-rose-300">{error}</p>
-                  ) : null}
+                  {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
                 </div>
               </>
             ) : (
-              <>
-                <div className="rounded-[1.5rem] border border-amoura-red-soft/30 bg-black/35 p-5 shadow-[0_0_40px_rgba(194,31,58,0.14)]">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amoura-red-soft">
-                        Session created
-                      </p>
-                      <h2 className="amoura-serif mt-2 text-3xl text-amoura-cream">
-                        Share your invite link
-                      </h2>
-                      <p className="mt-2 text-sm leading-6 text-amoura-muted">
-                        Send this link to your partner so they can join your room.
-                      </p>
-                    </div>
-
-                    <div className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-amoura-red-soft/30 bg-amoura-red/10 text-amoura-red-soft">
-                      <Check className="h-5 w-5" />
-                    </div>
+              <div className="rounded-[1.5rem] border border-amoura-red-soft/30 bg-black/35 p-5 shadow-[0_0_40px_rgba(194,31,58,0.14)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amoura-red-soft">
+                      Session created
+                    </p>
+                    <h2 className="amoura-serif mt-2 text-3xl text-amoura-cream">
+                      Share your invite link
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-amoura-muted">
+                      Send this link to your partner so they can join your room.
+                    </p>
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-amoura-red-soft/15 bg-black/40 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amoura-muted">
-                      Session ID
-                    </p>
-                    <p className="mt-2 text-lg font-semibold text-amoura-cream">
-                      {roomCode}
-                    </p>
-
-                    <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-amoura-muted">
-                      Session Link
-                    </p>
-
-                    <div className="mt-2 rounded-xl border border-amoura-red-soft/15 bg-black/30 px-4 py-3 text-sm text-amoura-cream break-all">
-                      {inviteLink}
-                    </div>
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-amoura-red-soft/30 bg-amoura-red/10 text-amoura-red-soft">
+                    <Check className="h-5 w-5" />
                   </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <button
-                      onClick={copyLink}
-                      className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-5 py-4 text-sm font-semibold"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          Link copied
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copy Invite Link
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={shareLink}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/30 px-5 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
-                    >
-                      <Share2 className="h-4 w-4" />
-                      Share Link
-                    </button>
-                  </div>
-
-                  <Link
-                    href={`/booth/dual/room/${roomCode}`}
-                    className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-amoura-red-soft/20 bg-transparent px-5 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
-                  >
-                    Enter Waiting Room
-                  </Link>
                 </div>
-              </>
+
+                <div className="mt-5 rounded-2xl border border-amoura-red-soft/15 bg-black/40 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amoura-muted">
+                    Session ID
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-amoura-cream">
+                    {roomCode}
+                  </p>
+
+                  <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-amoura-muted">
+                    Session Link
+                  </p>
+
+                  <div className="mt-2 break-all rounded-xl border border-amoura-red-soft/15 bg-black/30 px-4 py-3 text-sm text-amoura-cream">
+                    {inviteLink}
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <button
+                    onClick={copyLink}
+                    className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-5 py-4 text-sm font-semibold"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Link copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        Copy Invite Link
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={shareLink}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/30 px-5 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Share Link
+                  </button>
+                </div>
+
+                <Link
+                  href={`/booth/dual/room/${roomCode}`}
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-amoura-red-soft/20 bg-transparent px-5 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
+                >
+                  Enter Waiting Room
+                </Link>
+              </div>
             )}
           </aside>
         </div>
       </section>
     </main>
+  )
+}
+
+function InfoCard({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-2xl border border-amoura-red-soft/15 bg-black/30 p-4">
+      <div className="mb-3 inline-flex rounded-full bg-amoura-red/10 p-2 text-amoura-red-soft">
+        {icon}
+      </div>
+      <p className="text-sm font-semibold text-amoura-cream">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-amoura-muted">{children}</p>
+    </div>
   )
 }

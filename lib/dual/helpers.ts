@@ -24,18 +24,16 @@ export function getDisplayName(user: {
       ? user.user_metadata.full_name
       : null
 
-  if (fullName && fullName.trim()) return fullName.trim()
+  if (fullName?.trim()) return fullName.trim()
 
   const name =
     typeof user.user_metadata?.name === "string"
       ? user.user_metadata.name
       : null
 
-  if (name && name.trim()) return name.trim()
+  if (name?.trim()) return name.trim()
 
-  if (user.email) {
-    return user.email.split("@")[0]
-  }
+  if (user.email) return user.email.split("@")[0]
 
   return "Guest"
 }
@@ -48,9 +46,7 @@ export function getInviteLink(roomCode: string) {
 export function getTimeLeft(expiresAt: string) {
   const diff = new Date(expiresAt).getTime() - Date.now()
 
-  if (diff <= 0) {
-    return "00:00"
-  }
+  if (diff <= 0) return "00:00"
 
   const minutes = Math.floor(diff / 60000)
   const seconds = Math.floor((diff % 60000) / 1000)
