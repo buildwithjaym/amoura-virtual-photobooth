@@ -9,9 +9,37 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
+        disallow: [
+          "/dashboard",
+          "/dashboard/",
+          "/auth/",
+          "/login",
+          "/create-account",
+        ],
+      },
+      {
+        userAgent: "Googlebot",
+        allow: "/",
+        disallow: [
+          "/dashboard",
+          "/dashboard/",
+          "/auth/",
+          "/login",
+          "/create-account",
+        ],
+      },
+      {
+        userAgent: "Bingbot",
+        allow: "/",
+        disallow: [
+          "/dashboard",
+          "/dashboard/",
+          "/auth/",
+          "/login",
+          "/create-account",
+        ],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,
-    host: baseUrl,
   }
 }
