@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
   Camera,
@@ -31,9 +31,33 @@ export default function SingleBoothClient() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [photos, setPhotos] = useState<string[]>([])
   const [isCapturing, setIsCapturing] = useState(false)
+  const [captureMessage, setCaptureMessage] = useState("")
 
   const isComplete = photos.length >= MAX_SHOTS
   const nextShotNumber = Math.min(photos.length + 1, MAX_SHOTS)
+
+  const nextButtonLabel = useMemo(() => {
+    if (photos.length === 0) return "Take Photo 1"
+    if (photos.length === 1) return "Take Photo 2"
+    if (photos.length === 2) return "Take Final Photo"
+    return "Continue to Strip Design"
+  }, [photos.length])
+
+  const captureGuideText = useMemo(() => {
+    if (photos.length === 0) {
+      return "Start with your first pose. Look at the camera, smile, and take your time."
+    }
+
+    if (photos.length === 1) {
+      return "Nice first shot. Change your pose before taking photo 2."
+    }
+
+    if (photos.length === 2) {
+      return "One last photo. Make it sweet, funny, cute, or dramatic."
+    }
+
+    return "Your photo set is complete. Choose your strip design next."
+  }, [photos.length])
 
   useEffect(() => {
     checkCameraPermission()
@@ -187,21 +211,35 @@ export default function SingleBoothClient() {
     }
   }
 
-  async function startPhotoSet() {
+  async function takeNextPhoto() {
     if (!isCameraReady || isCapturing || isComplete) return
 
     setIsCapturing(true)
+    setCaptureMessage("Get ready. Countdown is starting...")
 
-    const remainingShots = MAX_SHOTS - photos.length
+    await runCountdown()
 
-    for (let i = 0; i < remainingShots; i += 1) {
-      await runCountdown()
-      capturePhoto()
-      await wait(650)
+    const captured = capturePhoto()
+
+    if (captured) {
+      const shotNumber = photos.length + 1
+
+      if (shotNumber === 1) {
+        setCaptureMessage("Photo 1 saved. Prepare for photo 2.")
+      } else if (shotNumber === 2) {
+        setCaptureMessage("Photo 2 saved. One final pose left.")
+      } else {
+        setCaptureMessage("All photos captured. Continue to your strip design.")
+      }
+    } else {
+      setCaptureMessage("We could not capture that photo. Please try again.")
     }
 
     setCountdown(null)
-    setIsCapturing(false)
+
+    window.setTimeout(() => {
+      setIsCapturing(false)
+    }, 700)
   }
 
   function runCountdown() {
@@ -228,12 +266,12 @@ export default function SingleBoothClient() {
     const video = videoRef.current
     const canvas = canvasRef.current
 
-    if (!video || !canvas) return
+    if (!video || !canvas) return false
 
     const videoWidth = video.videoWidth
     const videoHeight = video.videoHeight
 
-    if (!videoWidth || !videoHeight) return
+    if (!videoWidth || !videoHeight) return false
 
     const targetWidth = 720
     const targetHeight = Math.round((videoHeight / videoWidth) * targetWidth)
@@ -242,7 +280,7 @@ export default function SingleBoothClient() {
     canvas.height = targetHeight
 
     const context = canvas.getContext("2d")
-    if (!context) return
+    if (!context) return false
 
     context.save()
     context.translate(targetWidth, 0)
@@ -256,17 +294,21 @@ export default function SingleBoothClient() {
       if (current.length >= MAX_SHOTS) return current
       return [...current, image]
     })
+
+    return true
   }
 
   function retakeAll() {
     setPhotos([])
     setCountdown(null)
     setIsCapturing(false)
+    setCaptureMessage("")
     sessionStorage.removeItem(STORAGE_KEY)
   }
 
   function removeShot(indexToRemove: number) {
     setPhotos((current) => current.filter((_, index) => index !== indexToRemove))
+    setCaptureMessage("")
   }
 
   function continueToPreview() {
@@ -307,7 +349,7 @@ export default function SingleBoothClient() {
                 Single Mode
               </p>
               <p className="text-xs text-amoura-muted">
-                {photos.length}/{MAX_SHOTS} shots captured
+                {photos.length}/{MAX_SHOTS} photos captured
               </p>
             </div>
           </header>
@@ -340,7 +382,7 @@ export default function SingleBoothClient() {
                       text={
                         permission === "unsupported"
                           ? cameraError
-                          : "AmoreFrame needs your camera to capture your photobooth shots. Click below and allow camera permission in your browser."
+                          : "AmoreFrame needs your camera to capture your photobooth photos. Click below and allow camera permission in your browser."
                       }
                       buttonText="Allow Camera"
                       onClick={requestCameraAccess}
@@ -376,17 +418,25 @@ export default function SingleBoothClient() {
 
                 {isCameraReady && (
                   <div className="absolute left-4 top-4 z-10 rounded-full border border-white/10 bg-black/60 px-4 py-2 text-xs font-semibold text-amoura-muted backdrop-blur-md">
-                    Shot {nextShotNumber} of {MAX_SHOTS}
+                    Photo {nextShotNumber} of {MAX_SHOTS}
                   </div>
                 )}
 
                 {isCameraReady && !isComplete && !isCapturing && (
                   <div className="absolute bottom-4 left-1/2 z-10 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-3xl border border-amoura-red-soft/20 bg-black/65 p-4 text-center backdrop-blur-md">
                     <p className="text-sm font-semibold text-amoura-cream">
-                      Ready when you are.
+                      {nextButtonLabel}
                     </p>
-                    <p className="mt-1 text-xs text-amoura-muted">
-                      Press start and AmoreFrame will capture your photo set automatically.
+                    <p className="mt-1 text-xs leading-5 text-amoura-muted">
+                      {captureGuideText}
+                    </p>
+                  </div>
+                )}
+
+                {captureMessage && countdown === null && (
+                  <div className="absolute left-1/2 top-4 z-20 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-3xl border border-amoura-red-soft/20 bg-black/70 p-4 text-center backdrop-blur-md">
+                    <p className="text-sm font-semibold text-amoura-cream">
+                      {captureMessage}
                     </p>
                   </div>
                 )}
@@ -406,10 +456,10 @@ export default function SingleBoothClient() {
                     </div>
 
                     <p className="font-semibold text-amoura-cream">
-                      Photo set complete
+                      Your 3 photos are ready
                     </p>
                     <p className="mt-1 text-sm text-amoura-muted">
-                      Continue to choose your strip design.
+                      Continue to choose your strip design, filter, and caption.
                     </p>
                   </div>
                 )}
@@ -426,36 +476,36 @@ export default function SingleBoothClient() {
                 </div>
 
                 <h1 className="amoura-serif text-4xl leading-tight text-amoura-cream">
-                  Capture your strip photos.
+                  Take your photos one by one.
                 </h1>
 
                 <p className="mt-3 text-sm leading-6 text-amoura-muted">
-                  Take {MAX_SHOTS} photos first. After that, you can choose the
-                  final photostrip design.
+                  Capture 3 photos at your own pace. After each shot, you can
+                  change your pose before taking the next one.
                 </p>
 
                 <div className="mt-5 grid gap-3 rounded-2xl border border-amoura-red-soft/15 bg-black/25 p-4 text-sm text-amoura-muted">
-                  <InfoLine text="Allow camera access once." />
-                  <InfoLine text="Next time, your browser can open it directly." />
-                  <InfoLine text="Choose your strip design after capture." />
+                  <InfoLine text="Take each photo manually." />
+                  <InfoLine text="Pause between shots to change poses." />
+                  <InfoLine text="Choose your strip design after all 3 photos." />
                 </div>
 
                 <div className="mt-6 grid gap-3">
                   {!isComplete ? (
                     <button
-                      onClick={startPhotoSet}
+                      onClick={takeNextPhoto}
                       disabled={!isCameraReady || isCapturing}
                       className="amoura-btn-primary inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isCapturing ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Capturing...
+                          Capturing photo...
                         </>
                       ) : (
                         <>
                           <Camera className="h-4 w-4" />
-                          Start Countdown
+                          {nextButtonLabel}
                         </>
                       )}
                     </button>
@@ -474,7 +524,7 @@ export default function SingleBoothClient() {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-6 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
                     >
                       <RefreshCcw className="h-4 w-4" />
-                      Retake all
+                      Retake all photos
                     </button>
                   )}
                 </div>
@@ -483,7 +533,7 @@ export default function SingleBoothClient() {
               <div className="rounded-[1.75rem] border border-amoura-red-soft/20 bg-white/[0.035] p-5">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold text-amoura-cream">
-                    Captured shots
+                    Captured photos
                   </h2>
 
                   <p className="rounded-full border border-amoura-red-soft/15 bg-black/25 px-3 py-1 text-xs text-amoura-muted">
@@ -503,7 +553,7 @@ export default function SingleBoothClient() {
                         <div className="relative">
                           <img
                             src={photo}
-                            alt={`Shot ${index + 1}`}
+                            alt={`Photo ${index + 1}`}
                             className="aspect-[4/3] w-full object-cover"
                           />
 
@@ -512,7 +562,7 @@ export default function SingleBoothClient() {
                               type="button"
                               onClick={() => removeShot(index)}
                               className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-amoura-muted opacity-0 transition hover:text-white group-hover:opacity-100"
-                              aria-label={`Remove shot ${index + 1}`}
+                              aria-label={`Remove photo ${index + 1}`}
                             >
                               <X className="h-4 w-4" />
                             </button>
@@ -520,7 +570,7 @@ export default function SingleBoothClient() {
                         </div>
 
                         <div className="flex items-center justify-center gap-2 py-2 text-xs text-amoura-muted">
-                          Shot {index + 1}
+                          Photo {index + 1}
                         </div>
                       </div>
                     ))}
@@ -536,7 +586,7 @@ export default function SingleBoothClient() {
                       Your photos stay private
                     </p>
                     <p className="mt-1 text-sm leading-6 text-amoura-muted">
-                      These shots are only stored temporarily in this browser
+                      These photos are only stored temporarily in this browser
                       until you continue to the strip design page.
                     </p>
                   </div>
@@ -621,12 +671,8 @@ function EmptyShots() {
     <div className="mt-5 rounded-2xl border border-white/5 bg-black/25 p-6 text-center">
       <Camera className="mx-auto mb-3 h-8 w-8 text-amoura-red-soft" />
       <p className="text-sm leading-6 text-amoura-muted">
-        Your shots will appear here after the countdown starts.
+        Your photos will appear here after each countdown.
       </p>
     </div>
   )
-}
-
-function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
 }
