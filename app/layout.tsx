@@ -5,59 +5,125 @@ import "./globals.css"
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 })
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 })
 
+const siteUrl = "https://www.amoreframe.com"
+
 export const metadata: Metadata = {
-  title: "Amoura — Virtual Photobooth",
+  metadataBase: new URL(siteUrl),
+
+  title: {
+    default: "AmoreFrame — Romantic Virtual Photobooth",
+    template: "%s | AmoreFrame",
+  },
+
   description:
-    "Amoura is a premium virtual photobooth made for couples, friends, solo portraits, and long-distance memories. Capture beautiful photostrips together, even when apart.",
-  applicationName: "Amoura",
+    "AmoreFrame is a romantic virtual photobooth for couples, dates, anniversaries, friends, and long-distance memories. Create beautiful photostrips together, even when apart.",
+
+  applicationName: "AmoreFrame",
+
   keywords: [
+    "AmoreFrame",
+    "romantic virtual photobooth",
     "virtual photobooth",
     "online photobooth",
     "couple photobooth",
+    "date night photobooth",
     "long distance couple app",
+    "long distance photobooth",
     "photo strip maker",
-    "amoura photobooth",
-    "ldr photobooth",
+    "photostrip maker",
     "mobile photobooth",
-    "Amoura",
+    "browser photobooth",
+    "PWA photobooth",
+    "romantic photo booth",
+    "online photo strip",
   ],
-  authors: [{ name: "Amoura" }],
-  creator: "Amoura",
+
+  authors: [{ name: "AmoreFrame" }],
+  creator: "AmoreFrame",
+  publisher: "AmoreFrame",
+
+  category: "photo",
+  classification: "Virtual Photobooth Application",
+
+  alternates: {
+    canonical: "/",
+  },
+
   manifest: "/manifest.json",
+
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+
   openGraph: {
-    title: "Amoura — Virtual Photobooth for Moments Together",
+    title: "AmoreFrame — Romantic Virtual Photobooth",
     description:
-      "A premium browser-based photobooth for couples, friends, and memories together — even from different places.",
+      "Create romantic photostrips together, even from afar. AmoreFrame is made for couples, dates, anniversaries, friends, and long-distance memories.",
     type: "website",
-    siteName: "Amoura",
+    url: "/",
+    siteName: "AmoreFrame",
+    locale: "en_US",
     images: [
       {
-        url: "/images/AMOURA.png",
+        url: "/images/amoreframe-og.png",
         width: 1200,
         height: 630,
-        alt: "Amoura Virtual Photobooth",
+        alt: "AmoreFrame romantic virtual photobooth preview",
       },
     ],
   },
+
   twitter: {
     card: "summary_large_image",
-    title: "Amoura — Virtual Photobooth for Moments Together",
+    title: "AmoreFrame — Romantic Virtual Photobooth",
     description:
       "Create beautiful photobooth memories with someone you love, even when apart.",
-    images: ["/images/AMOURA.png"],
+    images: ["/images/amoreframe-og.png"],
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+
+  appleWebApp: {
+    capable: true,
+    title: "AmoreFrame",
+    statusBarStyle: "black-translucent",
+  },
+
+  formatDetection: {
+    telephone: false,
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: "#030303",
+  themeColor: "#0B0507",
   colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({
@@ -67,7 +133,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
       </body>
     </html>
