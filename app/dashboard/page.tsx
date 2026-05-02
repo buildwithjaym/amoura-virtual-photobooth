@@ -3,21 +3,14 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
   Camera,
+  Download,
   Heart,
-  Images,
   LogOut,
+  ShieldCheck,
   Sparkles,
   Users,
 } from "lucide-react"
 import { createClient } from "@/utils/supabase/server"
-
-type Photostrip = {
-  id: string
-  title: string | null
-  image_url: string
-  mode: string | null
-  created_at: string
-}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -35,14 +28,6 @@ export default async function DashboardPage() {
     user.user_metadata?.name ||
     user.email?.split("@")[0] ||
     "there"
-
-  const avatarUrl = user.user_metadata?.avatar_url
-
-  const { data: photostrips } = await supabase
-    .from("photostrips")
-    .select("id, title, image_url, mode, created_at")
-    .order("created_at", { ascending: false })
-    .limit(3)
 
   async function signOut() {
     "use server"
@@ -112,12 +97,12 @@ export default async function DashboardPage() {
               </div>
 
               <h1 className="amoura-serif mx-auto max-w-4xl text-4xl leading-[0.98] text-amoura-cream sm:text-5xl xl:text-6xl">
-                Welcome, {displayName}. What kind of photobooth do you want to start?
+                Welcome, {displayName}. Start a photobooth moment.
               </h1>
 
               <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-amoura-muted sm:text-lg sm:leading-8">
-                Choose a mode below. You will take your photos first, then pick
-                the final strip style and theme after your shots are captured.
+                Take your photos first, customize the final strip after, then
+                download it directly to your device.
               </p>
             </div>
           </section>
@@ -127,8 +112,8 @@ export default async function DashboardPage() {
               href="/booth/single"
               icon={Camera}
               label="Single Mode"
-              title="Start a solo photobooth"
-              text="Best for solo portraits, date-night memories, profile shots, and personal photostrips. Open the camera, follow the countdown, and capture your set."
+              title="Solo photobooth"
+              text="Capture 3 photos at your own pace, then choose your strip design, filter, and caption before downloading."
               button="Start Single Mode"
               primary
             />
@@ -137,18 +122,30 @@ export default async function DashboardPage() {
               href="/booth/dual"
               icon={Users}
               label="Dual Mode"
-              title="Start a booth together"
-              text="Best for long-distance couples, friends, and shared online moments. Create a session, invite someone, and capture a connected strip together."
+              title="Photobooth together"
+              text="Create a private room, invite someone, capture synced photos together, then design your shared strip."
               button="Start Dual Mode"
             />
           </section>
 
-          <section>
-            {photostrips && photostrips.length > 0 ? (
-              <RecentStrips photostrips={photostrips} />
-            ) : (
-              <EmptyStrips />
-            )}
+          <section className="grid gap-5 lg:grid-cols-3">
+            <InfoCard
+              icon={ShieldCheck}
+              title="Private by default"
+              text="Your photostrips are not saved to our database. They stay in your browser during the session."
+            />
+
+            <InfoCard
+              icon={Download}
+              title="Download your strip"
+              text="After editing your design, save the final photostrip directly to your device."
+            />
+
+            <InfoCard
+              icon={Heart}
+              title="Made for moments"
+              text="Use Single Mode for solo shots or Dual Mode for couples, friends, and long-distance memories."
+            />
           </section>
         </div>
       </section>
@@ -214,66 +211,24 @@ function BoothModeCard({
   )
 }
 
-function EmptyStrips() {
+function InfoCard({
+  icon: Icon,
+  title,
+  text,
+}: {
+  icon: React.ElementType
+  title: string
+  text: string
+}) {
   return (
-    <div className="rounded-[1.5rem] border border-amoura-red-soft/20 bg-white/[0.035] p-6 text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-amoura-red-soft/25 bg-amoura-red/10">
-        <Heart className="h-6 w-6 text-amoura-red-soft" />
+    <div className="rounded-[1.5rem] border border-amoura-red-soft/20 bg-white/[0.035] p-5">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-amoura-red-soft/25 bg-amoura-red/10 text-amoura-red-soft">
+        <Icon className="h-6 w-6" />
       </div>
 
-      <h2 className="amoura-serif text-3xl text-amoura-cream">
-        No saved strips yet
-      </h2>
+      <h2 className="text-xl font-semibold text-amoura-cream">{title}</h2>
 
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-amoura-muted">
-        After your first successful photobooth session, your saved strips will
-        appear here.
-      </p>
-    </div>
-  )
-}
-
-function RecentStrips({ photostrips }: { photostrips: Photostrip[] }) {
-  return (
-    <div className="rounded-[1.5rem] border border-amoura-red-soft/20 bg-white/[0.035] p-5 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-amoura-red-soft">
-            Recent
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold text-amoura-cream">
-            Your saved strips
-          </h2>
-        </div>
-
-        <Link
-          href="/gallery"
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-5 py-3 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
-        >
-          <Images className="h-4 w-4" />
-          Open Gallery
-        </Link>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        {photostrips.slice(0, 3).map((strip) => (
-          <Link
-            key={strip.id}
-            href={`/gallery/${strip.id}`}
-            className="overflow-hidden rounded-2xl border border-white/5 bg-black/30 transition hover:border-amoura-red-soft/40"
-          >
-            <div className="relative aspect-[3/4]">
-              <Image
-                src={strip.image_url}
-                alt={strip.title || "Saved photostrip"}
-                fill
-                sizes="220px"
-                className="object-cover"
-              />
-            </div>
-          </Link>
-        ))}
-      </div>
+      <p className="mt-2 text-sm leading-6 text-amoura-muted">{text}</p>
     </div>
   )
 }
