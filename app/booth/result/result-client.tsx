@@ -17,14 +17,14 @@ import {
 type StripDesign = {
   id: string
   name: string
-  tagline: string
+  subtitle: string
   brand: string
   accent: string
-  background: string
-  photoBorder: string
-  textColor: string
-  mutedTextColor: string
-  previewDot: string
+  backgroundClass: string
+  outerBorderClass: string
+  innerCardClass: string
+  titleClass: string
+  subtitleClass: string
   canvas: {
     background: string
     border: string
@@ -39,7 +39,7 @@ type StripDesign = {
 type FilterOption = {
   id: string
   name: string
-  tagline: string
+  subtitle: string
   cssFilter: string
   canvasFilter: string
 }
@@ -50,7 +50,7 @@ const MAX_CAPTION = 50
 const STRIP_WIDTH = 900
 const PHOTO_WIDTH = 760
 const PHOTO_HEIGHT = 540
-const TOP_PADDING = 90
+const TOP_PADDING = 98
 const GAP = 30
 const BOTTOM_PADDING = 185
 const STRIP_HEIGHT =
@@ -58,82 +58,85 @@ const STRIP_HEIGHT =
 
 const STRIP_DESIGNS: StripDesign[] = [
   {
-    id: "amore-blush",
+    id: "soft-romance",
     name: "Soft Romance",
-    tagline: "Soft pink, sweet, and dreamy.",
+    subtitle: "Sweet, rosy, and made for love.",
     brand: "AmoreFrame",
     accent: "♥",
-    background:
-      "bg-[radial-gradient(circle_at_top,#ffe4ec_0%,#fff7f9_38%,#ffd6e0_100%)] border-pink-200",
-    photoBorder: "border-white shadow-[0_12px_30px_rgba(190,24,93,0.18)]",
-    textColor: "text-rose-800",
-    mutedTextColor: "text-rose-600",
-    previewDot: "bg-pink-200",
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#ffe3ec_0%,#fff7fa_40%,#ffd6e1_100%)]",
+    outerBorderClass: "border-pink-200/80",
+    innerCardClass: "border-white shadow-[0_14px_35px_rgba(190,24,93,0.14)]",
+    titleClass: "text-rose-900",
+    subtitleClass: "text-rose-700",
     canvas: {
       background: "#fff1f5",
       border: "#f9a8d4",
       photoBorder: "#ffffff",
-      text: "#9f1239",
+      text: "#881337",
       mutedText: "#be185d",
       accent: "#e11d48",
       decoration: "hearts",
     },
   },
   {
-    id: "classic-white",
-    name: "Pure White",
-    tagline: "Clean, timeless, and elegant.",
-    brand: "AmoreFrame",
-    accent: "♡",
-    background: "bg-[#fbfaf8] border-neutral-300",
-    photoBorder: "border-neutral-200 shadow-[0_10px_25px_rgba(0,0,0,0.12)]",
-    textColor: "text-neutral-900",
-    mutedTextColor: "text-neutral-500",
-    previewDot: "bg-neutral-200",
-    canvas: {
-      background: "#fbfaf8",
-      border: "#d4d4d4",
-      photoBorder: "#e5e5e5",
-      text: "#171717",
-      mutedText: "#737373",
-      accent: "#111111",
-      decoration: "minimal",
-    },
-  },
-  {
-    id: "noir-romance",
+    id: "noir-date",
     name: "Noir Date",
-    tagline: "Dark, cinematic, and intimate.",
+    subtitle: "Dark, intimate, and cinematic.",
     brand: "AmoreFrame",
     accent: "♥",
-    background:
-      "bg-[radial-gradient(circle_at_top,#3b0a13_0%,#141014_42%,#050505_100%)] border-rose-900/50",
-    photoBorder: "border-rose-300/25 shadow-[0_15px_40px_rgba(0,0,0,0.45)]",
-    textColor: "text-rose-100",
-    mutedTextColor: "text-rose-300",
-    previewDot: "bg-rose-500",
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#4b0d1b_0%,#180b12_42%,#050505_100%)]",
+    outerBorderClass: "border-rose-900/60",
+    innerCardClass:
+      "border-rose-300/20 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
+    titleClass: "text-rose-100",
+    subtitleClass: "text-rose-300",
     canvas: {
-      background: "#09090b",
+      background: "#0a0a0b",
       border: "#7f1d1d",
       photoBorder: "#881337",
       text: "#ffe4e6",
       mutedText: "#fda4af",
-      accent: "#e11d48",
+      accent: "#fb7185",
       decoration: "stars",
     },
   },
   {
-    id: "vintage-film",
-    name: "Vintage Film",
-    tagline: "Warm nostalgic tones and grainy charm.",
+    id: "pure-white",
+    name: "Pure White",
+    subtitle: "Minimal, clean, and timeless.",
+    brand: "AmoreFrame",
+    accent: "♡",
+    backgroundClass:
+      "bg-[linear-gradient(to_bottom,#fcfcfb,#f8f7f4,#f4f1ec)]",
+    outerBorderClass: "border-neutral-300/80",
+    innerCardClass: "border-neutral-200 shadow-[0_14px_32px_rgba(0,0,0,0.12)]",
+    titleClass: "text-neutral-900",
+    subtitleClass: "text-neutral-500",
+    canvas: {
+      background: "#fafaf9",
+      border: "#d4d4d4",
+      photoBorder: "#e5e5e5",
+      text: "#171717",
+      mutedText: "#6b7280",
+      accent: "#111827",
+      decoration: "minimal",
+    },
+  },
+  {
+    id: "vintage-love",
+    name: "Vintage Love",
+    subtitle: "Warm nostalgia with film charm.",
     brand: "AmoreFrame",
     accent: "✦",
-    background:
-      "bg-[linear-gradient(to_bottom,#ead7b7,#d6b98f,#ead7b7)] border-amber-900/25",
-    photoBorder: "border-amber-950/20 shadow-[0_12px_30px_rgba(92,52,18,0.22)]",
-    textColor: "text-amber-950",
-    mutedTextColor: "text-amber-900",
-    previewDot: "bg-amber-300",
+    backgroundClass:
+      "bg-[linear-gradient(to_bottom,#ead7b7,#d7bc91,#efdcbc)]",
+    outerBorderClass: "border-amber-800/35",
+    innerCardClass:
+      "border-amber-950/20 shadow-[0_14px_32px_rgba(92,52,18,0.2)]",
+    titleClass: "text-amber-950",
+    subtitleClass: "text-amber-900",
     canvas: {
       background: "#dfc39a",
       border: "#92400e",
@@ -145,17 +148,41 @@ const STRIP_DESIGNS: StripDesign[] = [
     },
   },
   {
+    id: "barkada-fun",
+    name: "Barkada Fun",
+    subtitle: "Playful, colorful, and full of energy.",
+    brand: "AmoreFrame",
+    accent: "✿",
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#fff6ab_0%,#fffef1_36%,#ffd49d_100%)]",
+    outerBorderClass: "border-orange-200/80",
+    innerCardClass:
+      "border-white shadow-[0_12px_28px_rgba(234,88,12,0.18)]",
+    titleClass: "text-orange-950",
+    subtitleClass: "text-orange-700",
+    canvas: {
+      background: "#fff7d1",
+      border: "#fdba74",
+      photoBorder: "#ffffff",
+      text: "#431407",
+      mutedText: "#c2410c",
+      accent: "#f97316",
+      decoration: "flowers",
+    },
+  },
+  {
     id: "midnight-luxe",
     name: "Midnight Luxe",
-    tagline: "Bold black, luxe mood, and date-night glow.",
+    subtitle: "Elegant black with a luxe glow.",
     brand: "AmoreFrame",
     accent: "✦",
-    background:
-      "bg-[radial-gradient(circle_at_top,#3b2f18_0%,#111015_42%,#050505_100%)] border-amber-500/30",
-    photoBorder: "border-amber-300/25 shadow-[0_15px_40px_rgba(0,0,0,0.45)]",
-    textColor: "text-amber-100",
-    mutedTextColor: "text-amber-300",
-    previewDot: "bg-amber-400",
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#352713_0%,#141016_40%,#050505_100%)]",
+    outerBorderClass: "border-amber-500/30",
+    innerCardClass:
+      "border-amber-300/20 shadow-[0_18px_40px_rgba(0,0,0,0.45)]",
+    titleClass: "text-amber-100",
+    subtitleClass: "text-amber-300",
     canvas: {
       background: "#09090b",
       border: "#b45309",
@@ -166,65 +193,43 @@ const STRIP_DESIGNS: StripDesign[] = [
       decoration: "stars",
     },
   },
-  {
-    id: "barkada-pop",
-    name: "Barkada Fun",
-    tagline: "Bright, playful, and memory-filled.",
-    brand: "AmoreFrame",
-    accent: "✿",
-    background:
-      "bg-[radial-gradient(circle_at_top,#fff7ad_0%,#fffdf0_35%,#ffd6a5_100%)] border-orange-200",
-    photoBorder: "border-white shadow-[0_12px_30px_rgba(234,88,12,0.16)]",
-    textColor: "text-orange-950",
-    mutedTextColor: "text-orange-700",
-    previewDot: "bg-orange-300",
-    canvas: {
-      background: "#fff7d6",
-      border: "#fdba74",
-      photoBorder: "#ffffff",
-      text: "#431407",
-      mutedText: "#c2410c",
-      accent: "#f97316",
-      decoration: "flowers",
-    },
-  },
 ]
 
 const FILTERS: FilterOption[] = [
   {
-    id: "none",
+    id: "original",
     name: "Original",
-    tagline: "Natural look",
+    subtitle: "Natural tone",
     cssFilter: "none",
     canvasFilter: "none",
   },
   {
     id: "warm",
     name: "Warm Glow",
-    tagline: "Soft and cozy",
+    subtitle: "Soft and cozy",
     cssFilter: "sepia(18%) saturate(118%) brightness(103%) contrast(102%)",
     canvasFilter: "sepia(18%) saturate(118%) brightness(103%) contrast(102%)",
   },
   {
     id: "dreamy",
     name: "Dreamy Pink",
-    tagline: "Romantic tint",
+    subtitle: "Romantic tint",
     cssFilter:
       "saturate(112%) brightness(104%) contrast(98%) sepia(8%) hue-rotate(-10deg)",
     canvasFilter:
       "saturate(112%) brightness(104%) contrast(98%) sepia(8%) hue-rotate(-10deg)",
   },
   {
-    id: "bw",
+    id: "film",
     name: "B&W Film",
-    tagline: "Classic mono",
+    subtitle: "Classic monochrome",
     cssFilter: "grayscale(100%) contrast(108%) brightness(102%)",
     canvasFilter: "grayscale(100%) contrast(108%) brightness(102%)",
   },
   {
-    id: "cool",
-    name: "Cool Breeze",
-    tagline: "Fresh and airy",
+    id: "fresh",
+    name: "Fresh Air",
+    subtitle: "Cool and clean",
     cssFilter: "saturate(106%) brightness(103%) hue-rotate(10deg)",
     canvasFilter: "saturate(106%) brightness(103%) hue-rotate(10deg)",
   },
@@ -232,15 +237,20 @@ const FILTERS: FilterOption[] = [
 
 export default function ResultClient() {
   const [photos, setPhotos] = useState<string[]>([])
-  const [selectedDesign, setSelectedDesign] = useState<StripDesign>(
-    STRIP_DESIGNS[2]
-  )
-  const [selectedFilter, setSelectedFilter] = useState<FilterOption>(FILTERS[0])
+  const [selectedDesignId, setSelectedDesignId] = useState("noir-date")
+  const [selectedFilterId, setSelectedFilterId] = useState("original")
   const [caption, setCaption] = useState("")
   const [draftCaption, setDraftCaption] = useState("")
   const [isCaptionModalOpen, setIsCaptionModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
+
+  const selectedDesign =
+    STRIP_DESIGNS.find((design) => design.id === selectedDesignId) ??
+    STRIP_DESIGNS[0]
+
+  const selectedFilter =
+    FILTERS.find((filter) => filter.id === selectedFilterId) ?? FILTERS[0]
 
   useEffect(() => {
     const raw = sessionStorage.getItem(STORAGE_KEY)
@@ -322,9 +332,7 @@ export default function ResultClient() {
       <main className="amoura-page flex min-h-screen items-center justify-center px-6">
         <div className="text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-amoura-red-soft" />
-          <p className="mt-4 text-amoura-muted">
-            Preparing your strip preview...
-          </p>
+          <p className="mt-4 text-amoura-muted">Preparing your strip preview...</p>
         </div>
       </main>
     )
@@ -333,12 +341,12 @@ export default function ResultClient() {
   return (
     <>
       <main className="amoura-page min-h-screen overflow-x-hidden">
-        <section className="relative min-h-screen px-4 py-4 sm:px-6 lg:px-8">
+        <section className="relative px-4 py-4 sm:px-6 lg:px-8">
           <div className="pointer-events-none absolute right-[-10%] top-[-8%] h-[280px] w-[280px] rounded-full bg-amoura-red/20 blur-[110px]" />
           <div className="pointer-events-none absolute left-[-12%] bottom-[-8%] h-[240px] w-[240px] rounded-full bg-amoura-red-deep/20 blur-[100px]" />
 
-          <div className="relative mx-auto flex min-h-[calc(100vh-2rem)] max-w-7xl flex-col gap-4">
-            <header className="shrink-0 rounded-[1.35rem] border border-amoura-red-soft/20 bg-black/45 px-4 py-3 backdrop-blur-xl sm:px-5">
+          <div className="relative mx-auto max-w-7xl">
+            <header className="rounded-[1.35rem] border border-amoura-red-soft/20 bg-black/45 px-4 py-3 backdrop-blur-xl sm:px-5">
               <div className="flex items-center justify-between gap-3">
                 <Link
                   href="/dashboard"
@@ -353,15 +361,16 @@ export default function ResultClient() {
                     Strip Editor
                   </p>
                   <p className="text-xs text-amoura-muted">
-                    Customize and download
+                    Theme, filter, caption, download
                   </p>
                 </div>
               </div>
             </header>
 
-            <section className="grid flex-1 gap-4 lg:min-h-0 lg:grid-cols-[minmax(260px,0.72fr)_minmax(360px,1fr)] xl:grid-cols-[minmax(300px,0.7fr)_minmax(420px,1fr)]">
-              <section className="order-1 flex min-h-[360px] items-center justify-center rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-3 backdrop-blur-xl sm:min-h-[420px] sm:p-5 lg:order-1 lg:min-h-0">
-                <div className="flex h-full w-full items-center justify-center overflow-hidden">
+            <section className="mt-4 grid gap-4 lg:grid-cols-[minmax(280px,0.85fr)_minmax(400px,1.15fr)]">
+              {/* LEFT PREVIEW */}
+              <section className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-3 backdrop-blur-xl sm:p-5">
+                <div className="flex h-[520px] items-center justify-center sm:h-[620px] lg:h-[calc(100vh-9.5rem)] lg:min-h-[580px] lg:max-h-[760px]">
                   <PhotostripPreview
                     photos={previewPhotos}
                     design={selectedDesign}
@@ -371,162 +380,150 @@ export default function ResultClient() {
                 </div>
               </section>
 
-              <aside className="order-2 flex min-h-0 flex-col rounded-[1.6rem] border border-amoura-red-soft/20 bg-white/[0.035] p-4 sm:p-5 lg:order-2 lg:max-h-[calc(100vh-6.25rem)]">
-                <div className="shrink-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/25 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-amoura-pink">
-                    <Sparkles className="h-4 w-4" />
-                    Customize Your Strip
+              {/* RIGHT CONTROLS */}
+              <aside className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-white/[0.035] p-4 sm:p-5 lg:max-h-[calc(100vh-9.5rem)] lg:overflow-y-auto">
+                <div className="inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/25 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-amoura-pink">
+                  <Sparkles className="h-4 w-4" />
+                  Customize Your Strip
+                </div>
+
+                <h1 className="amoura-serif mt-4 text-3xl leading-tight text-amoura-cream sm:text-4xl">
+                  Every vibe. Every moment.
+                </h1>
+
+                <p className="mt-3 text-sm leading-6 text-amoura-muted">
+                  Pick a premium booth theme, apply a cute filter, add a short
+                  caption, and download your final photostrip.
+                </p>
+
+                {/* THEMES */}
+                <section className="mt-8">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-amoura-muted">
+                      Booth Themes
+                    </h2>
+                    <span className="text-xs text-amoura-muted">
+                      {STRIP_DESIGNS.length} styles
+                    </span>
                   </div>
 
-                  <h1 className="amoura-serif mt-4 text-3xl leading-tight text-amoura-cream sm:text-4xl">
-                    Every vibe. Every moment.
-                  </h1>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {STRIP_DESIGNS.map((design) => {
+                      const active = selectedDesign.id === design.id
 
-                  <p className="mt-3 text-sm leading-6 text-amoura-muted">
-                    Choose your booth theme, apply a cute filter, add a short
-                    caption, then download your final photostrip.
-                  </p>
-                </div>
-
-                <div className="mt-5 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
-                  <section>
-                    <div className="mb-3 flex items-center justify-between">
-                      <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-amoura-muted">
-                        Booth Themes
-                      </h2>
-                      <span className="text-xs text-amoura-muted">
-                        {STRIP_DESIGNS.length} styles
-                      </span>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {STRIP_DESIGNS.map((design) => {
-                        const active = selectedDesign.id === design.id
-
-                        return (
-                          <button
-                            key={design.id}
-                            onClick={() => setSelectedDesign(design)}
-                            className={`group rounded-[1.2rem] border p-3 text-left transition ${
-                              active
-                                ? "border-amoura-red-soft bg-amoura-red/10 shadow-[0_0_30px_rgba(194,31,58,0.14)]"
-                                : "border-amoura-red-soft/15 bg-black/25 hover:border-amoura-red-soft/40"
-                            }`}
-                          >
-                            <div
-                              className={`mb-3 flex h-24 flex-col items-center justify-between rounded-[0.95rem] border p-2 ${design.background}`}
-                            >
-                              <div className="text-[8px] font-semibold opacity-80">
-                                {design.brand}
-                              </div>
-
-                              <div className="grid w-full gap-1">
-                                <div className="h-3 rounded-md bg-black/30" />
-                                <div className="h-3 rounded-md bg-black/20" />
-                                <div className="h-3 rounded-md bg-black/25" />
-                              </div>
-
-                              <div className="text-[8px] opacity-70">
-                                {design.accent}
-                              </div>
-                            </div>
-
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-amoura-cream">
-                                  {design.name}
-                                </p>
-                                <p className="mt-1 line-clamp-2 text-xs leading-4 text-amoura-muted">
-                                  {design.tagline}
-                                </p>
-                              </div>
-
-                              {active && (
-                                <div className="shrink-0 rounded-full border border-amoura-red-soft/30 bg-amoura-red/10 p-1 text-amoura-red-soft">
-                                  <Check className="h-3.5 w-3.5" />
-                                </div>
-                              )}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </section>
-
-                  <section>
-                    <div className="mb-3 flex items-center gap-2">
-                      <Wand2 className="h-4 w-4 text-amoura-red-soft" />
-                      <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-amoura-muted">
-                        Cute Filters
-                      </h2>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                      {FILTERS.map((filter) => {
-                        const active = selectedFilter.id === filter.id
-
-                        return (
-                          <button
-                            key={filter.id}
-                            onClick={() => setSelectedFilter(filter)}
-                            className={`rounded-2xl border px-3 py-3 text-left transition ${
-                              active
-                                ? "border-amoura-red-soft bg-amoura-red/10"
-                                : "border-amoura-red-soft/15 bg-black/25 hover:border-amoura-red-soft/35"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-amoura-cream">
-                                  {filter.name}
-                                </p>
-                                <p className="truncate text-xs text-amoura-muted">
-                                  {filter.tagline}
-                                </p>
-                              </div>
-
-                              {active && (
-                                <Check className="h-4 w-4 shrink-0 text-amoura-red-soft" />
-                              )}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </section>
-
-                  <section>
-                    <div className="mb-3 flex items-center gap-2">
-                      <MessageCircleHeart className="h-4 w-4 text-amoura-red-soft" />
-                      <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-amoura-muted">
-                        Caption
-                      </h2>
-                    </div>
-
-                    <div className="rounded-[1.25rem] border border-amoura-red-soft/15 bg-black/25 p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-amoura-cream">
-                            {caption || "No caption added yet."}
-                          </p>
-                          <p className="mt-1 text-xs text-amoura-muted">
-                            Maximum {MAX_CAPTION} characters.
-                          </p>
-                        </div>
-
+                      return (
                         <button
-                          onClick={openCaptionModal}
-                          className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-5 py-3 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
+                          key={design.id}
+                          onClick={() => setSelectedDesignId(design.id)}
+                          className={`rounded-[1.2rem] border p-3 text-left transition ${
+                            active
+                              ? "border-amoura-red-soft bg-amoura-red/10 shadow-[0_0_30px_rgba(194,31,58,0.14)]"
+                              : "border-amoura-red-soft/15 bg-black/25 hover:border-amoura-red-soft/35"
+                          }`}
                         >
-                          <MessageCircleHeart className="h-4 w-4" />
-                          {caption ? "Edit" : "Add Caption"}
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-                </div>
+                          <ThemeCardPreview
+                            design={design}
+                            photo={previewPhotos[0]}
+                          />
 
-                <section className="mt-5 grid shrink-0 gap-3 border-t border-white/5 pt-5 sm:grid-cols-2">
+                          <div className="mt-3 flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-amoura-cream">
+                                {design.name}
+                              </p>
+                              <p className="mt-1 line-clamp-2 text-xs leading-4 text-amoura-muted">
+                                {design.subtitle}
+                              </p>
+                            </div>
+
+                            {active ? (
+                              <div className="shrink-0 rounded-full border border-amoura-red-soft/30 bg-amoura-red/10 p-1 text-amoura-red-soft">
+                                <Check className="h-3.5 w-3.5" />
+                              </div>
+                            ) : null}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+
+                {/* FILTERS */}
+                <section className="mt-8">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Wand2 className="h-4 w-4 text-amoura-red-soft" />
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-amoura-muted">
+                      Cute Filters
+                    </h2>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {FILTERS.map((filter) => {
+                      const active = selectedFilter.id === filter.id
+
+                      return (
+                        <button
+                          key={filter.id}
+                          onClick={() => setSelectedFilterId(filter.id)}
+                          className={`rounded-2xl border px-3 py-3 text-left transition ${
+                            active
+                              ? "border-amoura-red-soft bg-amoura-red/10"
+                              : "border-amoura-red-soft/15 bg-black/25 hover:border-amoura-red-soft/35"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-amoura-cream">
+                                {filter.name}
+                              </p>
+                              <p className="truncate text-xs text-amoura-muted">
+                                {filter.subtitle}
+                              </p>
+                            </div>
+
+                            {active ? (
+                              <Check className="h-4 w-4 shrink-0 text-amoura-red-soft" />
+                            ) : null}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+
+                {/* CAPTION */}
+                <section className="mt-8">
+                  <div className="mb-4 flex items-center gap-2">
+                    <MessageCircleHeart className="h-4 w-4 text-amoura-red-soft" />
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.22em] text-amoura-muted">
+                      Caption
+                    </h2>
+                  </div>
+
+                  <div className="rounded-[1.25rem] border border-amoura-red-soft/15 bg-black/25 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-amoura-cream">
+                          {caption || "No caption added yet."}
+                        </p>
+                        <p className="mt-1 text-xs text-amoura-muted">
+                          Up to {MAX_CAPTION} characters.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={openCaptionModal}
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-5 py-3 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
+                      >
+                        <MessageCircleHeart className="h-4 w-4" />
+                        {caption ? "Edit Caption" : "Add Caption"}
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                {/* ACTIONS */}
+                <section className="mt-8 grid gap-3 border-t border-white/5 pt-5 sm:grid-cols-2">
                   <button
                     onClick={downloadStrip}
                     disabled={isDownloading}
@@ -585,26 +582,27 @@ function PhotostripPreview({
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden">
       <div
-        className={`relative w-[min(42vw,32vh,260px)] overflow-hidden rounded-[1.35rem] border p-2 shadow-2xl sm:w-[min(36vw,42vh,300px)] sm:rounded-[1.6rem] sm:p-3 lg:w-[min(28vw,72vh,330px)] xl:w-[min(24vw,74vh,340px)] ${design.background}`}
+        className={`relative h-full max-h-full w-auto max-w-full overflow-hidden rounded-[1.55rem] border p-3 ${design.backgroundClass} ${design.outerBorderClass}`}
+        style={{ aspectRatio: `${STRIP_WIDTH} / ${STRIP_HEIGHT}` }}
       >
         <PreviewDecorations design={design} />
 
-        <div className={`relative z-10 mb-2 text-center sm:mb-3 ${design.textColor}`}>
-          <p className="text-base font-bold tracking-wide sm:text-xl">
+        <div className="relative z-10 text-center">
+          <p className={`text-[clamp(1rem,1vw+0.7rem,1.9rem)] font-bold ${design.titleClass}`}>
             {design.brand}
           </p>
           <p
-            className={`mt-0.5 text-[0.52rem] uppercase tracking-[0.18em] sm:text-[0.62rem] ${design.mutedTextColor}`}
+            className={`mt-0.5 text-[clamp(0.48rem,0.35vw+0.35rem,0.72rem)] uppercase tracking-[0.3em] ${design.subtitleClass}`}
           >
             {design.name}
           </p>
         </div>
 
-        <div className="relative z-10 grid gap-1.5 sm:gap-2">
+        <div className="relative z-10 mt-3 grid gap-2.5">
           {photos.map((photo, index) => (
             <div
               key={`${photo}-${index}`}
-              className={`overflow-hidden rounded-lg border-[3px] bg-black/10 sm:rounded-xl sm:border-[4px] ${design.photoBorder}`}
+              className={`overflow-hidden rounded-[1rem] border-[4px] bg-black/10 ${design.innerCardClass}`}
             >
               <img
                 src={photo}
@@ -617,17 +615,19 @@ function PhotostripPreview({
         </div>
 
         {caption ? (
-          <div className="relative z-10 mt-2 rounded-xl border border-white/10 bg-black/20 px-2 py-1.5 text-center sm:mt-3 sm:px-3 sm:py-2">
-            <p className={`text-[0.62rem] sm:text-xs ${design.textColor}`}>
+          <div className="relative z-10 mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-center">
+            <p className={`text-[clamp(0.62rem,0.45vw+0.45rem,0.88rem)] ${design.titleClass}`}>
               {caption}
             </p>
           </div>
         ) : null}
 
-        <div className={`relative z-10 mt-2 text-center sm:mt-3 ${design.textColor}`}>
-          <p className="text-xl leading-none sm:text-2xl">{design.accent}</p>
+        <div className={`relative z-10 mt-3 text-center ${design.titleClass}`}>
+          <p className="text-[clamp(1.1rem,1vw+0.8rem,1.8rem)] leading-none">
+            {design.accent}
+          </p>
           <p
-            className={`mt-1 text-[0.5rem] uppercase tracking-[0.18em] sm:text-[0.58rem] ${design.mutedTextColor}`}
+            className={`mt-1 text-[clamp(0.45rem,0.3vw+0.35rem,0.62rem)] uppercase tracking-[0.22em] ${design.subtitleClass}`}
           >
             Captured with love
           </p>
@@ -637,11 +637,56 @@ function PhotostripPreview({
   )
 }
 
+function ThemeCardPreview({
+  design,
+  photo,
+}: {
+  design: StripDesign
+  photo?: string
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-[1rem] border p-2 ${design.backgroundClass} ${design.outerBorderClass}`}
+    >
+      <div className="text-center">
+        <p className={`text-[9px] font-semibold ${design.titleClass}`}>
+          {design.brand}
+        </p>
+      </div>
+
+      <div className="mt-2 grid gap-1.5">
+        {[0, 1, 2].map((index) => (
+          <div
+            key={index}
+            className={`overflow-hidden rounded-md border-[2px] ${design.innerCardClass}`}
+          >
+            {photo ? (
+              <img
+                src={photo}
+                alt=""
+                className="aspect-[4/3] w-full object-cover"
+              />
+            ) : (
+              <div className="aspect-[4/3] w-full bg-black/10" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2 text-center">
+        <p className={`text-[8px] uppercase tracking-[0.2em] ${design.subtitleClass}`}>
+          {design.accent}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function PreviewDecorations({ design }: { design: StripDesign }) {
   if (design.canvas.decoration === "minimal") {
     return (
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-3 rounded-[1.5rem] border border-black/10" />
+        <div className="absolute inset-4 rounded-[1.4rem] border border-black/10" />
       </div>
     )
   }
@@ -649,24 +694,24 @@ function PreviewDecorations({ design }: { design: StripDesign }) {
   if (design.canvas.decoration === "film") {
     return (
       <div className="pointer-events-none absolute inset-0 opacity-35">
-        <div className="absolute left-1.5 top-0 h-full w-3 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_7px,transparent_7px,transparent_16px)] sm:left-2 sm:w-4" />
-        <div className="absolute right-1.5 top-0 h-full w-3 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_7px,transparent_7px,transparent_16px)] sm:right-2 sm:w-4" />
+        <div className="absolute left-2 top-0 h-full w-4 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_9px,transparent_9px,transparent_18px)]" />
+        <div className="absolute right-2 top-0 h-full w-4 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_9px,transparent_9px,transparent_18px)]" />
       </div>
     )
   }
 
   return (
     <div className="pointer-events-none absolute inset-0 opacity-70">
-      <span className="absolute left-3 top-3 text-sm sm:text-lg">
+      <span className="absolute left-3 top-3 text-sm">
         {design.canvas.decoration === "flowers" ? "🌸" : design.accent}
       </span>
-      <span className="absolute right-3 top-3 text-sm sm:text-lg">
+      <span className="absolute right-3 top-3 text-sm">
         {design.canvas.decoration === "flowers" ? "🌼" : design.accent}
       </span>
-      <span className="absolute bottom-3 left-3 text-sm sm:text-lg">
+      <span className="absolute bottom-3 left-3 text-sm">
         {design.canvas.decoration === "flowers" ? "🌷" : "✦"}
       </span>
-      <span className="absolute bottom-3 right-3 text-sm sm:text-lg">
+      <span className="absolute bottom-3 right-3 text-sm">
         {design.canvas.decoration === "flowers" ? "🌸" : "♥"}
       </span>
     </div>
@@ -685,8 +730,8 @@ function CaptionModal({
   onSave: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 px-3 pb-3 pt-10 backdrop-blur-md sm:items-center sm:p-4">
-      <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-[1.6rem] border border-amoura-red-soft/20 bg-[#0b0608] p-5 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+      <div className="w-full max-w-lg rounded-[1.6rem] border border-amoura-red-soft/20 bg-[#0b0608] p-5 shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-amoura-red-soft">
@@ -717,7 +762,7 @@ function CaptionModal({
             }
             maxLength={MAX_CAPTION}
             rows={4}
-            placeholder="For example: Our favorite memory ♥"
+            placeholder="For example: My favorite memory ♥"
             className="w-full resize-none rounded-2xl border border-amoura-red-soft/15 bg-black/35 px-4 py-3 text-sm text-amoura-cream outline-none transition placeholder:text-amoura-muted focus:border-amoura-red-soft/45"
           />
           <div className="mt-2 text-right text-xs text-amoura-muted">
@@ -725,7 +770,7 @@ function CaptionModal({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <button
             onClick={onClose}
             className="rounded-full border border-amoura-red-soft/20 bg-black/35 px-5 py-3 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
@@ -816,7 +861,7 @@ async function drawStrip({
     const captionBoxHeight = 52
 
     ctx.save()
-    ctx.globalAlpha = 0.2
+    ctx.globalAlpha = 0.18
     drawRoundedRect(
       ctx,
       captionBoxX,
@@ -879,7 +924,6 @@ function drawCanvasDecorations(
 
   if (decoration === "film") {
     ctx.globalAlpha = 0.3
-
     for (let y = 44; y < STRIP_HEIGHT - 44; y += 44) {
       drawRoundedRect(ctx, 34, y, 24, 20, 5, design.canvas.text)
       drawRoundedRect(
@@ -1103,6 +1147,7 @@ function drawStar(
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
+    image.crossOrigin = "anonymous"
     image.onload = () => resolve(image)
     image.onerror = reject
     image.src = src
