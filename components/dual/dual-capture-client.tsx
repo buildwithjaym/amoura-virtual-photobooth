@@ -8,6 +8,7 @@ import {
   Check,
   Heart,
   Loader2,
+  RefreshCcw,
   Sparkles,
   Users,
   VideoOff,
@@ -45,6 +46,16 @@ type DualResultData = {
   hostPhotos: string[]
   partnerPhotos: string[]
   createdAt: string
+}
+
+type DisplaySlot = {
+  key: "host" | "partner"
+  label: string
+  name: string
+  videoRef: React.RefObject<HTMLVideoElement | null>
+  isLocal: boolean
+  cameraReady: boolean
+  waiting: boolean
 }
 
 const MAX_SHOTS = 3
@@ -89,9 +100,12 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const [hostPhotos, setHostPhotos] = useState<string[]>([])
   const [partnerPhotos, setPartnerPhotos] = useState<string[]>([])
   const [error, setError] = useState("")
+  const [isViewSwapped, setIsViewSwapped] = useState(false)
+  const [isResultReady, setIsResultReady] = useState(false)
 
   const hostMember = members.find((member) => member.role === "host") ?? null
-  const partnerMember = members.find((member) => member.role === "partner") ?? null
+  const partnerMember =
+    members.find((member) => member.role === "partner") ?? null
   const currentMember =
     members.find((member) => member.user_id === currentUserId) ?? null
 
@@ -99,11 +113,46 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const partnerOnline = !!partnerMember?.is_connected
   const liveConnected = remoteReady || connectionState === "connected"
 
+  const hostName = hostMember?.display_name || "Host"
+  const partnerName = partnerMember?.display_name || "Partner"
+
+  const hostVideoRef = currentRole === "host" ? localVideoRef : remoteVideoRef
+  const partnerVideoRef =
+    currentRole === "partner" ? localVideoRef : remoteVideoRef
+
+  const hostCameraReady = currentRole === "host" ? cameraReady : remoteReady
+  const partnerCameraReady =
+    currentRole === "partner" ? cameraReady : remoteReady
+
+  const defaultSlots: DisplaySlot[] = [
+    {
+      key: "host",
+      label: "Host",
+      name: hostName,
+      videoRef: hostVideoRef,
+      isLocal: currentRole === "host",
+      cameraReady: hostCameraReady,
+      waiting: !hostMember?.is_connected,
+    },
+    {
+      key: "partner",
+      label: "Partner",
+      name: partnerName,
+      videoRef: partnerVideoRef,
+      isLocal: currentRole === "partner",
+      cameraReady: partnerCameraReady,
+      waiting: !partnerOnline,
+    },
+  ]
+
+  const displaySlots = isViewSwapped ? [...defaultSlots].reverse() : defaultSlots
+
   const nextPhotoLabel = useMemo(() => {
     if (!room) return "Start Photo 1"
 
     if (room.status === "countdown") return "Countdown running..."
     if (room.status === "capturing") return "Capturing..."
+    if (isResultReady) return "Continue to Strip Design"
 
     if (hostPhotos.length === 0 && partnerPhotos.length === 0) {
       return "Start Photo 1"
@@ -117,10 +166,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
       return "Take Final Photo"
     }
 
-    if (room.status === "completed") return "Photos Complete"
-
     return "Start Photo 1"
-  }, [room, hostPhotos.length, partnerPhotos.length])
+  }, [room, hostPhotos.length, partnerPhotos.length, isResultReady])
 
   const stageTitle = useMemo(() => {
     if (!room) return "Preparing room"
@@ -128,6 +175,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
     if (!partnerOnline) return "Waiting for partner"
     if (!cameraReady) return "Allow your camera"
     if (!liveConnected) return "Connecting cameras"
+
+    if (isResultReady) return "Photos are ready"
 
     if (room.status === "between_shots" && room.current_shot === 1) {
       return "Photo 1 captured"
@@ -137,16 +186,12 @@ export default function DualCaptureClient({ roomCode }: Props) {
       return "Photo 2 captured"
     }
 
-    if (room.status === "completed") {
-      return "All photos captured"
-    }
-
     if (room.current_shot === 1) return "Photo 1 of 3"
     if (room.current_shot === 2) return "Photo 2 of 3"
     if (room.current_shot === 3) return "Final photo"
 
     return "Ready to capture"
-  }, [room, partnerOnline, cameraReady, liveConnected])
+  }, [room, partnerOnline, cameraReady, liveConnected, isResultReady])
 
   const stageSubtitle = useMemo(() => {
     if (!partnerOnline) {
@@ -158,7 +203,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
 
     if (!liveConnected) {
-      return "Stay here while both cameras connect."
+      return "Stay here while both cameras connect. You can still prepare your pose."
+    }
+
+    if (isResultReady) {
+      return "Continue to the strip editor to choose your theme, filter, and caption."
     }
 
     if (room?.status === "between_shots" && room.current_shot === 1) {
@@ -167,10 +216,6 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
     if (room?.status === "between_shots" && room.current_shot === 2) {
       return "One last pose. Make the final photo count."
-    }
-
-    if (room?.status === "completed") {
-      return "Preparing your dual photostrip..."
     }
 
     if (room?.current_shot === 1) {
@@ -185,8 +230,15 @@ export default function DualCaptureClient({ roomCode }: Props) {
       return "Final pose. Make it sweet, funny, or romantic."
     }
 
-    return "The host can start when both cameras are connected."
-  }, [partnerOnline, cameraReady, liveConnected, room?.status, room?.current_shot])
+    return "The host can start when both cameras are ready."
+  }, [
+    partnerOnline,
+    cameraReady,
+    liveConnected,
+    room?.status,
+    room?.current_shot,
+    isResultReady,
+  ])
 
   const fetchRoomState = useCallback(async () => {
     const { data: roomData, error: roomError } = await supabase
@@ -250,7 +302,9 @@ export default function DualCaptureClient({ roomCode }: Props) {
         .eq("room_id", roomData.id)
 
       const safeMembers = existingMembers ?? []
-      const alreadyJoined = safeMembers.find((member) => member.user_id === user.id)
+      const alreadyJoined = safeMembers.find(
+        (member) => member.user_id === user.id
+      )
 
       let role: DualRoomMemberRole
 
@@ -262,7 +316,9 @@ export default function DualCaptureClient({ roomCode }: Props) {
           .update({ is_connected: true })
           .eq("id", alreadyJoined.id)
       } else {
-        const partnerExists = safeMembers.some((member) => member.role === "partner")
+        const partnerExists = safeMembers.some(
+          (member) => member.role === "partner"
+        )
 
         if (roomData.host_user_id === user.id) {
           role = "host"
@@ -443,7 +499,9 @@ export default function DualCaptureClient({ roomCode }: Props) {
     if (payload.from === currentUserId || !payload.sdp) return
     if (!peerRef.current) return
 
-    await peerRef.current.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+    await peerRef.current.setRemoteDescription(
+      new RTCSessionDescription(payload.sdp)
+    )
   }
 
   async function handleIce(payload: SignalPayload) {
@@ -522,7 +580,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     if (!currentRole || !channelRef.current) return
 
     setCapturingShot(shot)
-    setCaptureMessage("Capturing...")
+    setCaptureMessage("BOOM! Capturing...")
 
     const imageData = captureLocalPhoto()
 
@@ -550,7 +608,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     } else if (shot === 2) {
       setCaptureMessage("Photo 2 saved. One final pose left.")
     } else {
-      setCaptureMessage("All photos captured. Preparing your strip.")
+      setCaptureMessage("All photos captured. Continue to strip design.")
     }
 
     window.setTimeout(() => {
@@ -585,13 +643,17 @@ export default function DualCaptureClient({ roomCode }: Props) {
   async function startNextPhoto() {
     if (!room || !isHost) return
 
-    if (!cameraReady || !partnerOnline || !liveConnected) {
-      setError("Both cameras must be connected before taking the next photo.")
+    if (!cameraReady || !partnerOnline) {
+      setError(
+        "Both users must be inside the capture room before taking the next photo."
+      )
       return
     }
 
     const nextShot =
-      room.status === "between_shots" ? room.current_shot + 1 : room.current_shot || 1
+      room.status === "between_shots"
+        ? room.current_shot + 1
+        : room.current_shot || 1
 
     if (nextShot > MAX_SHOTS) return
 
@@ -614,6 +676,22 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
   }
 
+  function continueToStripDesign() {
+    if (!isResultReady) return
+
+    const data: DualResultData = {
+      roomCode,
+      hostName,
+      partnerName,
+      hostPhotos: hostPhotos.slice(0, MAX_SHOTS),
+      partnerPhotos: partnerPhotos.slice(0, MAX_SHOTS),
+      createdAt: new Date().toISOString(),
+    }
+
+    sessionStorage.setItem(DUAL_RESULT_KEY, JSON.stringify(data))
+    window.location.href = "/booth/dual/result"
+  }
+
   async function leaveCapture() {
     if (currentMember) {
       await supabase
@@ -626,6 +704,22 @@ export default function DualCaptureClient({ roomCode }: Props) {
     peerRef.current?.close()
 
     window.location.href = "/dashboard"
+  }
+
+  async function reconnectCamera() {
+    setRemoteReady(false)
+    setRemoteCameraReady(false)
+    madeOfferRef.current = false
+
+    peerRef.current?.close()
+    peerRef.current = null
+
+    if (!cameraReady) {
+      await startCamera()
+      return
+    }
+
+    await broadcastCameraReady()
   }
 
   useEffect(() => {
@@ -732,6 +826,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
     const captureAt = new Date(room.countdown_starts_at).getTime()
     const delay = Math.max(captureAt - Date.now(), 0)
 
+    setCountdown(Math.max(Math.ceil((captureAt - Date.now()) / 1000), 0))
+
     const countdownTimer = window.setInterval(() => {
       const diff = captureAt - Date.now()
 
@@ -762,22 +858,14 @@ export default function DualCaptureClient({ roomCode }: Props) {
   ])
 
   useEffect(() => {
-    const ready = hostPhotos.length >= MAX_SHOTS && partnerPhotos.length >= MAX_SHOTS
+    const ready =
+      hostPhotos.length >= MAX_SHOTS && partnerPhotos.length >= MAX_SHOTS
 
     if (!ready) return
 
-    const data: DualResultData = {
-      roomCode,
-      hostName: hostMember?.display_name || "Host",
-      partnerName: partnerMember?.display_name || "Partner",
-      hostPhotos: hostPhotos.slice(0, MAX_SHOTS),
-      partnerPhotos: partnerPhotos.slice(0, MAX_SHOTS),
-      createdAt: new Date().toISOString(),
-    }
-
-    sessionStorage.setItem(DUAL_RESULT_KEY, JSON.stringify(data))
-    window.location.href = "/booth/dual/result"
-  }, [hostPhotos, partnerPhotos, roomCode, hostMember, partnerMember])
+    setIsResultReady(true)
+    setCaptureMessage("All photos are ready. Continue to your strip design.")
+  }, [hostPhotos, partnerPhotos])
 
   if (loading) {
     return (
@@ -821,50 +909,65 @@ export default function DualCaptureClient({ roomCode }: Props) {
   return (
     <main className="amoura-page min-h-screen overflow-hidden px-3 py-3 sm:px-4">
       <section className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-7xl flex-col gap-3">
-        <header className="flex shrink-0 items-center justify-between gap-3 rounded-[1.25rem] border border-amoura-red-soft/20 bg-black/45 px-4 py-3 backdrop-blur-xl">
+        <header className="flex shrink-0 items-center justify-between gap-2 rounded-[1.25rem] border border-amoura-red-soft/20 bg-black/45 px-3 py-3 backdrop-blur-xl sm:px-4">
           <button
             onClick={leaveCapture}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-amoura-muted transition hover:text-amoura-cream"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-amoura-muted transition hover:text-amoura-cream sm:text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
             Leave
           </button>
 
           <div className="text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amoura-red-soft">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amoura-red-soft sm:text-xs">
               Dual Capture
             </p>
-            <p className="text-xs text-amoura-muted">{room.room_code}</p>
+            <p className="text-[10px] text-amoura-muted sm:text-xs">
+              {room.room_code}
+            </p>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-amoura-red-soft/15 bg-black/30 px-3 py-2 text-xs text-amoura-muted">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                liveConnected ? "bg-emerald-400" : "bg-zinc-400"
-              }`}
-            />
-            {liveConnected ? "Live" : "Syncing"}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setIsViewSwapped((current) => !current)}
+              className="rounded-full border border-amoura-red-soft/20 bg-black/30 px-3 py-2 text-[10px] font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45 sm:text-xs"
+            >
+              Swap
+            </button>
+
+            <button
+              onClick={reconnectCamera}
+              className="rounded-full border border-amoura-red-soft/20 bg-black/30 p-2 text-amoura-cream transition hover:border-amoura-red-soft/45"
+              aria-label="Reconnect camera"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+            </button>
+
+            <div className="hidden items-center gap-2 rounded-full border border-amoura-red-soft/15 bg-black/30 px-3 py-2 text-xs text-amoura-muted sm:flex">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  liveConnected ? "bg-emerald-400" : "bg-zinc-400"
+                }`}
+              />
+              {liveConnected ? "Live" : "Syncing"}
+            </div>
           </div>
         </header>
 
         <section className="relative min-h-0 flex-1 overflow-hidden rounded-[1.6rem] border border-amoura-red-soft/20 bg-black shadow-[0_0_70px_rgba(194,31,58,0.16)]">
           <div className="absolute inset-0 grid grid-cols-2">
-            <JoinedVideoStage
-              label="You"
-              name={currentMember?.display_name || "You"}
-              videoRef={localVideoRef}
-              isLocal
-              cameraReady={cameraReady}
-              onStartCamera={startCamera}
-            />
-
-            <JoinedVideoStage
-              label="Partner"
-              name={partnerMember?.display_name || "Partner"}
-              videoRef={remoteVideoRef}
-              cameraReady={remoteReady}
-              waiting={!partnerOnline}
-            />
+            {displaySlots.map((slot) => (
+              <JoinedVideoStage
+                key={slot.key}
+                label={slot.label}
+                name={slot.name}
+                videoRef={slot.videoRef}
+                isLocal={slot.isLocal}
+                cameraReady={slot.cameraReady}
+                waiting={slot.waiting}
+                onStartCamera={slot.isLocal ? startCamera : undefined}
+              />
+            ))}
           </div>
 
           <CaptureCenterOverlay
@@ -875,6 +978,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
             shot={room.current_shot}
             capturingShot={capturingShot}
             error={error}
+            isResultReady={isResultReady}
           />
         </section>
 
@@ -898,13 +1002,20 @@ export default function DualCaptureClient({ roomCode }: Props) {
           </div>
 
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            {isHost ? (
+            {isResultReady ? (
+              <button
+                onClick={continueToStripDesign}
+                className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-semibold"
+              >
+                <Check className="h-4 w-4" />
+                Continue to Strip Design
+              </button>
+            ) : isHost ? (
               <button
                 onClick={startNextPhoto}
                 disabled={
                   !cameraReady ||
                   !partnerOnline ||
-                  !liveConnected ||
                   room.status === "countdown" ||
                   room.status === "capturing" ||
                   room.status === "completed"
@@ -916,7 +1027,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
               </button>
             ) : (
               <div className="rounded-full border border-amoura-red-soft/20 bg-black/40 px-5 py-4 text-center text-sm font-semibold text-amoura-muted">
-                Waiting for host to start the next photo
+                Waiting for host to take the next photo
               </div>
             )}
 
@@ -977,10 +1088,10 @@ function JoinedVideoStage({
             <>
               <Users className="h-9 w-9 text-amoura-red-soft sm:h-12 sm:w-12" />
               <p className="mt-3 text-xs font-semibold text-amoura-cream sm:text-sm">
-                Partner offline
+                Waiting
               </p>
               <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-amoura-muted sm:max-w-xs sm:text-xs sm:leading-5">
-                Waiting for your partner to reconnect.
+                Partner camera is not connected yet.
               </p>
             </>
           ) : (
@@ -1018,6 +1129,7 @@ function CaptureCenterOverlay({
   shot,
   capturingShot,
   error,
+  isResultReady,
 }: {
   title: string
   subtitle: string
@@ -1026,6 +1138,7 @@ function CaptureCenterOverlay({
   shot: number
   capturingShot: number | null
   error: string
+  isResultReady: boolean
 }) {
   const isCounting = countdown !== null
 
@@ -1036,14 +1149,18 @@ function CaptureCenterOverlay({
       }`}
     >
       {isCounting ? (
-        <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border border-amoura-red-soft/50 bg-black/70 text-6xl font-bold text-amoura-cream shadow-[0_0_80px_rgba(194,31,58,0.45)] backdrop-blur-xl sm:h-44 sm:w-44 sm:text-8xl">
-          {countdown > 0 ? countdown : "📸"}
+        <div className="mx-auto flex h-36 w-36 items-center justify-center rounded-full border border-amoura-red-soft/50 bg-black/75 px-3 text-center text-5xl font-bold leading-none text-amoura-cream shadow-[0_0_90px_rgba(194,31,58,0.5)] backdrop-blur-xl sm:h-48 sm:w-48 sm:text-7xl">
+          {countdown > 0 ? countdown : "BOOM!"}
         </div>
       ) : (
         <div className="rounded-[1.4rem] border border-amoura-red-soft/20 bg-black/45 p-4 shadow-2xl backdrop-blur-xl sm:p-5">
           <div className="mx-auto mb-2 inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/20 bg-amoura-red/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amoura-red-soft sm:text-xs">
             <Sparkles className="h-3.5 w-3.5" />
-            {shot ? `Photo ${shot} of 3` : "Capture stage"}
+            {isResultReady
+              ? "Ready"
+              : shot
+                ? `Photo ${shot} of 3`
+                : "Capture stage"}
           </div>
 
           <h1 className="amoura-serif text-2xl leading-none text-amoura-cream sm:text-4xl">
