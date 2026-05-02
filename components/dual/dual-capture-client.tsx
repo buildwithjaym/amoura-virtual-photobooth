@@ -12,6 +12,8 @@ import {
   Sparkles,
   Users,
   VideoOff,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { getDisplayName } from "@/lib/dual/helpers"
@@ -67,38 +69,44 @@ const MAX_SHOTS = 3
 const CAPTURE_DELAY_MS = 3300
 const DUAL_RESULT_KEY = "amoreframe_dual_photos"
 
-//like a call server
+const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME
+const turnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL
+
 const rtcConfig: RTCConfiguration = {
   iceServers: [
     {
       urls: "stun:stun.relay.metered.ca:80",
     },
-    {
-      urls: "turn:global.relay.metered.ca:80",
-      username: process.env.NEXT_PUBLIC_TURN_USERNAME!,
-      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL!,
-    },
-    {
-      urls: "turn:global.relay.metered.ca:80?transport=tcp",
-      username: process.env.NEXT_PUBLIC_TURN_USERNAME!,
-      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL!,
-    },
-    {
-      urls: "turn:global.relay.metered.ca:443",
-      username: process.env.NEXT_PUBLIC_TURN_USERNAME!,
-      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL!,
-    },
-    {
-      urls: "turns:global.relay.metered.ca:443?transport=tcp",
-      username: process.env.NEXT_PUBLIC_TURN_USERNAME!,
-      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL!,
-    },
+    ...(turnUsername && turnCredential
+      ? [
+          {
+            urls: "turn:global.relay.metered.ca:80",
+            username: turnUsername,
+            credential: turnCredential,
+          },
+          {
+            urls: "turn:global.relay.metered.ca:80?transport=tcp",
+            username: turnUsername,
+            credential: turnCredential,
+          },
+          {
+            urls: "turn:global.relay.metered.ca:443",
+            username: turnUsername,
+            credential: turnCredential,
+          },
+          {
+            urls: "turns:global.relay.metered.ca:443?transport=tcp",
+            username: turnUsername,
+            credential: turnCredential,
+          },
+        ]
+      : []),
   ],
   iceCandidatePoolSize: 10,
 }
 
 export default function DualCaptureClient({ roomCode }: Props) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null)
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -108,10 +116,16 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const peerRef = useRef<RTCPeerConnection | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  const madeOfferRef = useRef(false)
   const scheduledShotRef = useRef<number | null>(null)
   const hostPhotosRef = useRef<string[]>([])
   const partnerPhotosRef = useRef<string[]>([])
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([])
+  const makingOfferRef = useRef(false)
+  const ignoreOfferRef = useRef(false)
+  const lastOfferAtRef = useRef(0)
+
+  const currentUserIdRef = useRef("")
+  const currentRoleRef = useRef<DualRoomMemberRole | null>(null)
 
   const [room, setRoom] = useState<DualRoom | null>(null)
   const [members, setMembers] = useState<DualRoomMember[]>([])
@@ -124,6 +138,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
   const [remoteReady, setRemoteReady] = useState(false)
   const [connectionState, setConnectionState] =
     useState<RTCPeerConnectionState>("new")
+  const [iceState, setIceState] = useState<RTCIceConnectionState>("new")
 
   const [countdown, setCountdown] = useState<number | null>(null)
   const [captureMessage, setCaptureMessage] = useState("")
@@ -143,7 +158,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
   const isHost = currentRole === "host"
   const partnerOnline = !!partnerMember?.is_connected
-  const liveConnected = remoteReady || connectionState === "connected"
+  const liveConnected =
+    remoteReady ||
+    connectionState === "connected" ||
+    iceState === "connected" ||
+    iceState === "completed"
   const isViewSwapped = !!room?.is_view_swapped
 
   const hostName = hostMember?.display_name || "Host"
@@ -191,13 +210,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
       return "Start Photo 1"
     }
 
-    if (room.status === "between_shots" && room.current_shot === 1) {
-      return "Take Photo 2"
-    }
-
-    if (room.status === "between_shots" && room.current_shot === 2) {
-      return "Take Final Photo"
-    }
+    if (room.current_shot === 1) return "Take Photo 2"
+    if (room.current_shot === 2) return "Take Final Photo"
 
     return "Start Photo 1"
   }, [room, hostPhotos.length, partnerPhotos.length, isResultReady])
@@ -211,11 +225,11 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
     if (isResultReady) return "Your photos are ready"
 
-    if (room.status === "between_shots" && room.current_shot === 1) {
+    if (room.current_shot === 1 && room.status !== "countdown") {
       return "Photo 1 saved"
     }
 
-    if (room.status === "between_shots" && room.current_shot === 2) {
+    if (room.current_shot === 2 && room.status !== "countdown") {
       return "Photo 2 saved"
     }
 
@@ -236,18 +250,18 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
 
     if (!liveConnected) {
-      return "Stay here while both cameras connect. You can already prepare your pose."
+      return "Stay here while both cameras connect. If it takes too long, tap reconnect."
     }
 
     if (isResultReady) {
       return "Choose your theme, filter, and caption in the strip editor."
     }
 
-    if (room?.status === "between_shots" && room.current_shot === 1) {
+    if (room?.current_shot === 1 && room.status !== "countdown") {
       return "Nice shot. Change your pose before photo 2."
     }
 
-    if (room?.status === "between_shots" && room.current_shot === 2) {
+    if (room?.current_shot === 2 && room.status !== "countdown") {
       return "One last pose. Make the final photo your favorite."
     }
 
@@ -272,6 +286,14 @@ export default function DualCaptureClient({ roomCode }: Props) {
     room?.current_shot,
     isResultReady,
   ])
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId
+  }, [currentUserId])
+
+  useEffect(() => {
+    currentRoleRef.current = currentRole
+  }, [currentRole])
 
   const fetchRoomState = useCallback(async () => {
     const { data: roomData, error: roomError } = await supabase
@@ -317,6 +339,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       }
 
       setCurrentUserId(user.id)
+      currentUserIdRef.current = user.id
 
       const { data: roomData, error: roomError } = await supabase
         .from("dual_rooms")
@@ -346,7 +369,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
         await supabase
           .from("dual_room_members")
-          .update({ is_connected: true })
+          .update({ is_connected: true, is_ready: true })
           .eq("id", alreadyJoined.id)
       } else {
         const partnerExists = safeMembers.some(
@@ -385,6 +408,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
       }
 
       setCurrentRole(role)
+      currentRoleRef.current = role
+
       await fetchRoomState()
     } finally {
       setLoading(false)
@@ -395,47 +420,69 @@ export default function DualCaptureClient({ roomCode }: Props) {
     try {
       setError("")
 
+      if (localStreamRef.current) {
+        setCameraReady(true)
+        await broadcastCameraReady()
+        maybeStartConnection()
+        return
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: "user",
         },
-        audio: true,
+        audio: false,
       })
 
       localStreamRef.current = stream
 
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream
+        await localVideoRef.current.play().catch(() => undefined)
       }
 
       setCameraReady(true)
 
-      if (peerRef.current) {
-        stream.getTracks().forEach((track) => {
-          peerRef.current?.addTrack(track, stream)
-        })
-      }
+      const peer = createPeer()
+      addLocalTracks(peer)
 
       window.setTimeout(() => {
         broadcastCameraReady().catch(console.error)
-      }, 400)
-    } catch {
+        maybeStartConnection()
+      }, 300)
+    } catch (cameraError) {
+      console.error("Camera error:", cameraError)
       setCameraReady(false)
       setError("Camera access is required for the capture stage.")
     }
   }
 
+  function addLocalTracks(peer: RTCPeerConnection) {
+    const stream = localStreamRef.current
+    if (!stream) return
+
+    const existingTrackIds = new Set(
+      peer.getSenders().map((sender) => sender.track?.id).filter(Boolean)
+    )
+
+    stream.getTracks().forEach((track) => {
+      if (!existingTrackIds.has(track.id)) {
+        peer.addTrack(track, stream)
+      }
+    })
+  }
+
   async function broadcastCameraReady() {
-    if (!channelRef.current || !currentRole) return
+    if (!channelRef.current || !currentRoleRef.current) return
 
     await channelRef.current.send({
       type: "broadcast",
       event: "camera-ready",
       payload: {
-        from: currentUserId,
-        role: currentRole,
+        from: currentUserIdRef.current,
+        role: currentRoleRef.current,
       },
     })
   }
@@ -449,25 +496,42 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStreamRef.current
+      remoteVideoRef.current.play().catch(() => undefined)
     }
 
     peer.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStreamRef.current?.addTrack(track)
+      const stream = event.streams[0]
+
+      stream.getTracks().forEach((track) => {
+        const alreadyAdded = remoteStreamRef.current
+          ?.getTracks()
+          .some((existingTrack) => existingTrack.id === track.id)
+
+        if (!alreadyAdded) {
+          remoteStreamRef.current?.addTrack(track)
+        }
       })
 
+      if (remoteVideoRef.current && remoteStreamRef.current) {
+        remoteVideoRef.current.srcObject = remoteStreamRef.current
+        remoteVideoRef.current.play().catch(() => undefined)
+      }
+
       setRemoteReady(true)
+      setError("")
     }
 
     peer.onicecandidate = async (event) => {
-      if (!event.candidate || !channelRef.current || !currentRole) return
+      if (!event.candidate || !channelRef.current || !currentRoleRef.current) {
+        return
+      }
 
       await channelRef.current.send({
         type: "broadcast",
         event: "webrtc-ice",
         payload: {
-          from: currentUserId,
-          role: currentRole,
+          from: currentUserIdRef.current,
+          role: currentRoleRef.current,
           candidate: event.candidate.toJSON(),
         } satisfies SignalPayload,
       })
@@ -475,76 +539,179 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
     peer.onconnectionstatechange = () => {
       setConnectionState(peer.connectionState)
+
+      if (
+        peer.connectionState === "failed" ||
+        peer.connectionState === "disconnected" ||
+        peer.connectionState === "closed"
+      ) {
+        setRemoteReady(false)
+      }
     }
 
-    localStreamRef.current?.getTracks().forEach((track) => {
-      peer.addTrack(track, localStreamRef.current as MediaStream)
-    })
+    peer.oniceconnectionstatechange = () => {
+      setIceState(peer.iceConnectionState)
+
+      if (
+        peer.iceConnectionState === "failed" ||
+        peer.iceConnectionState === "disconnected"
+      ) {
+        setRemoteReady(false)
+      }
+    }
 
     peerRef.current = peer
+
+    addLocalTracks(peer)
+
     return peer
   }
 
-  async function makeOffer() {
-    if (!channelRef.current || !currentRole || madeOfferRef.current) return
-    if (!isHost || !partnerMember || !cameraReady || !remoteCameraReady) return
+  async function makeOffer(force = false) {
+    if (!channelRef.current || !currentRoleRef.current) return
+    if (currentRoleRef.current !== "host") return
+    if (!localStreamRef.current) return
+
+    const now = Date.now()
+
+    if (!force && now - lastOfferAtRef.current < 1200) return
 
     const peer = createPeer()
-    madeOfferRef.current = true
+    addLocalTracks(peer)
 
-    const offer = await peer.createOffer()
-    await peer.setLocalDescription(offer)
+    if (peer.signalingState !== "stable") return
 
-    await channelRef.current.send({
-      type: "broadcast",
-      event: "webrtc-offer",
-      payload: {
-        from: currentUserId,
-        role: currentRole,
-        sdp: offer,
-      } satisfies SignalPayload,
-    })
+    try {
+      lastOfferAtRef.current = now
+      makingOfferRef.current = true
+
+      const offer = await peer.createOffer({
+        iceRestart:
+          force ||
+          peer.iceConnectionState === "failed" ||
+          peer.iceConnectionState === "disconnected",
+      })
+
+      await peer.setLocalDescription(offer)
+
+      await channelRef.current.send({
+        type: "broadcast",
+        event: "webrtc-offer",
+        payload: {
+          from: currentUserIdRef.current,
+          role: currentRoleRef.current,
+          sdp: peer.localDescription ?? offer,
+        } satisfies SignalPayload,
+      })
+    } catch (offerError) {
+      console.error("Offer error:", offerError)
+      setError("We could not start the live connection. Please tap reconnect.")
+    } finally {
+      makingOfferRef.current = false
+    }
   }
 
   async function handleOffer(payload: SignalPayload) {
-    if (payload.from === currentUserId || !payload.sdp || !currentRole) return
-    if (currentRole !== "partner" || !cameraReady) return
+    if (payload.from === currentUserIdRef.current || !payload.sdp) return
+    if (!localStreamRef.current || !currentRoleRef.current) return
 
     const peer = createPeer()
+    addLocalTracks(peer)
 
-    await peer.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+    const isPolite = currentRoleRef.current === "partner"
+    const offerCollision =
+      payload.sdp.type === "offer" &&
+      (makingOfferRef.current || peer.signalingState !== "stable")
 
-    const answer = await peer.createAnswer()
-    await peer.setLocalDescription(answer)
+    ignoreOfferRef.current = !isPolite && offerCollision
 
-    await channelRef.current?.send({
-      type: "broadcast",
-      event: "webrtc-answer",
-      payload: {
-        from: currentUserId,
-        role: currentRole,
-        sdp: answer,
-      } satisfies SignalPayload,
-    })
+    if (ignoreOfferRef.current) return
+
+    try {
+      await peer.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+      await flushPendingCandidates()
+
+      if (payload.sdp.type === "offer") {
+        const answer = await peer.createAnswer()
+        await peer.setLocalDescription(answer)
+
+        await channelRef.current?.send({
+          type: "broadcast",
+          event: "webrtc-answer",
+          payload: {
+            from: currentUserIdRef.current,
+            role: currentRoleRef.current,
+            sdp: peer.localDescription ?? answer,
+          } satisfies SignalPayload,
+        })
+      }
+    } catch (offerError) {
+      console.error("Handle offer error:", offerError)
+      setError("Live connection failed. Please tap reconnect.")
+    }
   }
 
   async function handleAnswer(payload: SignalPayload) {
-    if (payload.from === currentUserId || !payload.sdp) return
-    if (!peerRef.current) return
+    if (payload.from === currentUserIdRef.current || !payload.sdp) return
 
-    await peerRef.current.setRemoteDescription(
-      new RTCSessionDescription(payload.sdp)
-    )
+    const peer = peerRef.current
+    if (!peer) return
+
+    try {
+      if (peer.signalingState !== "have-local-offer") return
+
+      await peer.setRemoteDescription(new RTCSessionDescription(payload.sdp))
+      await flushPendingCandidates()
+    } catch (answerError) {
+      console.error("Handle answer error:", answerError)
+    }
   }
 
   async function handleIce(payload: SignalPayload) {
-    if (payload.from === currentUserId || !payload.candidate) return
-    if (!peerRef.current) return
+    if (payload.from === currentUserIdRef.current || !payload.candidate) return
+
+    const peer = peerRef.current
+
+    if (!peer || !peer.remoteDescription) {
+      pendingCandidatesRef.current.push(payload.candidate)
+      return
+    }
 
     try {
-      await peerRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate))
-    } catch (err) {
-      console.error("ICE candidate error:", err)
+      await peer.addIceCandidate(new RTCIceCandidate(payload.candidate))
+    } catch (iceError) {
+      if (!ignoreOfferRef.current) {
+        console.error("ICE candidate error:", iceError)
+      }
+    }
+  }
+
+  async function flushPendingCandidates() {
+    const peer = peerRef.current
+    if (!peer || !peer.remoteDescription) return
+
+    const candidates = [...pendingCandidatesRef.current]
+    pendingCandidatesRef.current = []
+
+    for (const candidate of candidates) {
+      try {
+        await peer.addIceCandidate(new RTCIceCandidate(candidate))
+      } catch (iceError) {
+        console.error("Pending ICE error:", iceError)
+      }
+    }
+  }
+
+  function maybeStartConnection() {
+    if (!localStreamRef.current || !currentRoleRef.current) return
+
+    const peer = createPeer()
+    addLocalTracks(peer)
+
+    if (currentRoleRef.current === "host") {
+      makeOffer().catch(console.error)
+    } else {
+      broadcastCameraReady().catch(console.error)
     }
   }
 
@@ -605,7 +772,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
   }
 
   async function handlePhotoCaptured(payload: PhotoPayload) {
-    if (payload.from === currentUserId) return
+    if (payload.from === currentUserIdRef.current) return
     storeCapturedPhoto(payload.role, payload.shot, payload.imageData)
   }
 
@@ -616,12 +783,12 @@ export default function DualCaptureClient({ roomCode }: Props) {
   }
 
   function handleResultReady(payload: ResultPayload) {
-    if (payload.from === currentUserId) return
+    if (payload.from === currentUserIdRef.current) return
     saveResultData(payload.data)
   }
 
   async function captureShot(shot: number) {
-    if (!currentRole || !channelRef.current) return
+    if (!currentRoleRef.current || !channelRef.current) return
 
     setCapturingShot(shot)
     setCaptureMessage("Capturing your photo...")
@@ -639,14 +806,14 @@ export default function DualCaptureClient({ roomCode }: Props) {
       return
     }
 
-    storeCapturedPhoto(currentRole, shot, imageData)
+    storeCapturedPhoto(currentRoleRef.current, shot, imageData)
 
     await channelRef.current.send({
       type: "broadcast",
       event: "photo-captured",
       payload: {
-        from: currentUserId,
-        role: currentRole,
+        from: currentUserIdRef.current,
+        role: currentRoleRef.current,
         shot,
         imageData,
       } satisfies PhotoPayload,
@@ -664,13 +831,13 @@ export default function DualCaptureClient({ roomCode }: Props) {
       setCapturingShot(null)
     }, 800)
 
-    if (isHost && room) {
+    if (currentRoleRef.current === "host" && room) {
       window.setTimeout(async () => {
         if (shot < MAX_SHOTS) {
           await supabase
             .from("dual_rooms")
             .update({
-              status: "between_shots",
+              status: "ready",
               current_shot: shot,
               countdown_starts_at: null,
             })
@@ -699,10 +866,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       return
     }
 
-    const nextShot =
-      room.status === "between_shots"
-        ? room.current_shot + 1
-        : room.current_shot || 1
+    const nextShot = room.current_shot >= 1 ? room.current_shot + 1 : 1
 
     if (nextShot > MAX_SHOTS) return
 
@@ -781,19 +945,35 @@ export default function DualCaptureClient({ roomCode }: Props) {
   }
 
   async function reconnectCamera() {
+    setError("")
     setRemoteReady(false)
     setRemoteCameraReady(false)
-    madeOfferRef.current = false
+    setConnectionState("new")
+    setIceState("new")
+    pendingCandidatesRef.current = []
+    makingOfferRef.current = false
+    ignoreOfferRef.current = false
+    lastOfferAtRef.current = 0
 
     peerRef.current?.close()
     peerRef.current = null
+    remoteStreamRef.current = null
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null
+    }
 
     if (!cameraReady) {
       await startCamera()
       return
     }
 
+    maybeStartConnection()
     await broadcastCameraReady()
+
+    if (currentRoleRef.current === "host") {
+      window.setTimeout(() => makeOffer(true).catch(console.error), 400)
+    }
   }
 
   useEffect(() => {
@@ -811,13 +991,18 @@ export default function DualCaptureClient({ roomCode }: Props) {
   }, [roomCode])
 
   useEffect(() => {
-    if (!room?.id) return
+    if (!room?.id || !currentUserId || !currentRole) return
 
     const channel = supabase
       .channel(`dual-capture-${room.id}`)
       .on("broadcast", { event: "camera-ready" }, ({ payload }) => {
-        if (payload?.from !== currentUserId) {
+        if (payload?.from !== currentUserIdRef.current) {
           setRemoteCameraReady(true)
+          maybeStartConnection()
+
+          if (currentRoleRef.current === "host") {
+            window.setTimeout(() => makeOffer().catch(console.error), 300)
+          }
         }
       })
       .on("broadcast", { event: "webrtc-offer" }, async ({ payload }) => {
@@ -859,7 +1044,16 @@ export default function DualCaptureClient({ roomCode }: Props) {
           await fetchRoomState()
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          channelRef.current = channel
+
+          window.setTimeout(() => {
+            broadcastCameraReady().catch(console.error)
+            maybeStartConnection()
+          }, 500)
+        }
+      })
 
     channelRef.current = channel
 
@@ -868,28 +1062,26 @@ export default function DualCaptureClient({ roomCode }: Props) {
       channelRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room?.id, currentUserId, currentRole, cameraReady])
+  }, [room?.id, currentUserId, currentRole])
 
   useEffect(() => {
-    if (cameraReady && partnerMember) {
+    if (!cameraReady || !partnerMember) return
+
+    const interval = window.setInterval(() => {
       broadcastCameraReady().catch(console.error)
-    }
+
+      if (!remoteReady) {
+        maybeStartConnection()
+
+        if (currentRoleRef.current === "host") {
+          makeOffer().catch(console.error)
+        }
+      }
+    }, 2500)
+
+    return () => window.clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraReady, partnerMember?.id])
-
-  useEffect(() => {
-    if (!isHost || !partnerMember || !cameraReady || !remoteCameraReady) return
-
-    const timer = window.setTimeout(() => {
-      makeOffer().catch((err) => {
-        console.error(err)
-        setError("We could not connect the live preview.")
-      })
-    }, 800)
-
-    return () => window.clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHost, partnerMember?.id, cameraReady, remoteCameraReady])
+  }, [cameraReady, partnerMember?.id, remoteReady])
 
   useEffect(() => {
     if (!room || room.status !== "countdown") return
@@ -940,7 +1132,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
       type: "broadcast",
       event: "result-ready",
       payload: {
-        from: currentUserId,
+        from: currentUserIdRef.current,
         data,
       } satisfies ResultPayload,
     })
@@ -950,7 +1142,6 @@ export default function DualCaptureClient({ roomCode }: Props) {
     roomCode,
     hostName,
     partnerName,
-    currentUserId,
     isResultReady,
   ])
 
@@ -1159,7 +1350,7 @@ function JoinedVideoStage({
         ref={videoRef}
         autoPlay
         playsInline
-        muted={isLocal}
+        muted
         className={`h-full w-full object-cover ${isLocal ? "scale-x-[-1]" : ""}`}
       />
 
@@ -1182,7 +1373,7 @@ function JoinedVideoStage({
                 Waiting
               </p>
               <p className="mt-1 max-w-[150px] text-[10px] leading-4 text-amoura-muted sm:max-w-xs sm:text-xs sm:leading-5">
-                Partner camera is not connected yet.
+                Waiting for this side to connect.
               </p>
             </>
           ) : (
