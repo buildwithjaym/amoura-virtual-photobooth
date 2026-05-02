@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
+import PWARegister from "@/components/pwa-register"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -47,7 +48,7 @@ export const metadata: Metadata = {
     "online photo strip",
   ],
 
-  authors: [{ name: "AmoreFrame" }],
+  authors: [{ name: "AmoreFrame", url: siteUrl }],
   creator: "AmoreFrame",
   publisher: "AmoreFrame",
 
@@ -66,7 +67,14 @@ export const metadata: Metadata = {
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/icons/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [
+      {
+        url: "/icons/apple-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+    shortcut: ["/favicon.ico"],
   },
 
   openGraph: {
@@ -98,9 +106,11 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    nocache: false,
     googleBot: {
       index: true,
       follow: true,
+      noimageindex: false,
       "max-image-preview": "large",
       "max-snippet": -1,
       "max-video-preview": -1,
@@ -115,6 +125,8 @@ export const metadata: Metadata = {
 
   formatDetection: {
     telephone: false,
+    email: false,
+    address: false,
   },
 }
 
@@ -123,7 +135,7 @@ export const viewport: Viewport = {
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({
@@ -133,7 +145,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} bg-[#0B0507] text-amoura-cream antialiased`}
+      >
+        <PWARegister />
         {children}
       </body>
     </html>
