@@ -1,14 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ArrowLeft,
   Camera,
@@ -18,14 +11,10 @@ import {
   Loader2,
   RefreshCcw,
   Send,
-  UserCircle2,
   Users,
-  Video,
-  VideoOff,
 } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import {
-  getCountdownSeconds,
   getDisplayName,
   getInviteLink,
   getTimeLeft,
@@ -40,58 +29,16 @@ type Props = {
   roomCode: string
 }
 
-type SignalPayload = {
-  from: string
-  role: DualRoomMemberRole
-  sdp?: RTCSessionDescriptionInit
-  candidate?: RTCIceCandidateInit
-}
-
-type PhotoPayload = {
-  from: string
-  role: DualRoomMemberRole
-  shot: number
-  imageData: string
-}
-
-const rtcConfig: RTCConfiguration = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-}
-
-const MAX_DUAL_SHOTS = 3
-const DUAL_RESULT_KEY = "amoreframe_dual_photos"
-
 export default function DualRoomClient({ roomCode }: Props) {
   const supabase = createClient()
-
-  const localVideoRef = useRef<HTMLVideoElement | null>(null)
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
-  const localStreamRef = useRef<MediaStream | null>(null)
-  const remoteStreamRef = useRef<MediaStream | null>(null)
-  const peerRef = useRef<RTCPeerConnection | null>(null)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-
-  const madeOfferRef = useRef(false)
-  const scheduledShotRef = useRef<number | null>(null)
-  const hostPhotosRef = useRef<string[]>([])
-  const partnerPhotosRef = useRef<string[]>([])
 
   const [room, setRoom] = useState<DualRoom | null>(null)
   const [members, setMembers] = useState<DualRoomMember[]>([])
   const [currentUserId, setCurrentUserId] = useState("")
   const [currentRole, setCurrentRole] = useState<DualRoomMemberRole | null>(null)
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
+
   const [loading, setLoading] = useState(true)
-
-  const [cameraReady, setCameraReady] = useState(false)
-  const [remoteCameraReady, setRemoteCameraReady] = useState(false)
-  const [remoteReady, setRemoteReady] = useState(false)
-  const [connectionState, setConnectionState] =
-    useState<RTCPeerConnectionState>("new")
-
-  const [capturingShot, setCapturingShot] = useState<number | null>(null)
-  const [hostPhotos, setHostPhotos] = useState<string[]>([])
-  const [partnerPhotos, setPartnerPhotos] = useState<string[]>([])
-
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState("")
 
@@ -99,14 +46,17 @@ export default function DualRoomClient({ roomCode }: Props) {
 
   const hostMember = members.find((member) => member.role === "host") ?? null
   const partnerMember = members.find((member) => member.role === "partner") ?? null
-
   const currentMember =
     members.find((member) => member.user_id === currentUserId) ?? null
 
   const isHost = currentRole === "host"
+  const partnerOnline =
+    !!partnerMember?.user_id && onlineUserIds.includes(partnerMember.user_id)
+  const hostOnline = !!hostMember?.user_id && onlineUserIds.includes(hostMember.user_id)
+
   const bothReady = !!hostMember?.is_ready && !!partnerMember?.is_ready
+  const canStart = isHost && bothReady && partnerOnline
   const timeLeft = room ? getTimeLeft(room.expires_at) : "00:00"
-  const countdown = getCountdownSeconds(room?.countdown_starts_at ?? null)
 
   const fetchRoomState = useCallback(async () => {
     const { data: roomData, error: roomError } = await supabase
@@ -118,7 +68,7 @@ export default function DualRoomClient({ roomCode }: Props) {
     if (roomError || !roomData) {
       setRoom(null)
       setMembers([])
-      setError("This room could not be found or may have already expired.")
+      setError("This photobooth room could not be found or may have expired.")
       return
     }
 
@@ -128,13 +78,16 @@ export default function DualRoomClient({ roomCode }: Props) {
       .eq("room_id", roomData.id)
       .order("joined_at", { ascending: true })
 
-    if (memberError) throw memberError
+    if (memberError) {
+      setError("We could not load the room members.")
+      return
+    }
 
     setRoom(roomData as DualRoom)
     setMembers((memberData ?? []) as DualRoomMember[])
   }, [roomCode, supabase])
 
-  async function ensureJoined() {
+  async function joinRoom() {
     try {
       setLoading(true)
       setError("")
@@ -144,7 +97,7 @@ export default function DualRoomClient({ roomCode }: Props) {
       } = await supabase.auth.getUser()
 
       if (!user) {
-        window.location.href = "/create-account"
+        window.location.href = `/create-account?next=/booth/dual/room/${roomCode}`
         return
       }
 
@@ -174,7 +127,7 @@ export default function DualRoomClient({ roomCode }: Props) {
       const safeMembers = existingMembers ?? []
       const alreadyJoined = safeMembers.find((member) => member.user_id === user.id)
 
-      let role: DualRoomMemberRole | null = null
+      let role: DualRoomMemberRole
 
       if (alreadyJoined) {
         role = alreadyJoined.role as DualRoomMemberRole
@@ -211,323 +164,95 @@ export default function DualRoomClient({ roomCode }: Props) {
             is_connected: true,
           })
 
-        if (insertError) throw insertError
+        if (insertError) {
+          setError("We could not join this room.")
+          return
+        }
+
+        if (role === "partner") {
+          await supabase
+            .from("dual_rooms")
+            .update({ status: "partner_joined" })
+            .eq("id", roomData.id)
+        }
       }
 
       setCurrentRole(role)
       await fetchRoomState()
-    } catch (err) {
-      console.error(err)
-      setError("We couldn’t join the session right now.")
     } finally {
       setLoading(false)
     }
   }
 
-  async function broadcastCameraReady() {
-    if (!channelRef.current || !currentRole) return
-
-    await channelRef.current.send({
-      type: "broadcast",
-      event: "camera-ready",
-      payload: {
-        from: currentUserId,
-        role: currentRole,
-      },
-    })
-  }
-
-  async function startCamera() {
+  async function copyLink() {
     try {
-      setError("")
+      await navigator.clipboard.writeText(inviteLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setError("We could not copy the invite link.")
+    }
+  }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: "user",
-        },
-        audio: true,
+  async function toggleReady() {
+    if (!currentMember) return
+
+    const { error: updateError } = await supabase
+      .from("dual_room_members")
+      .update({ is_ready: !currentMember.is_ready })
+      .eq("id", currentMember.id)
+
+    if (updateError) {
+      setError("We could not update your ready status.")
+    }
+  }
+
+  async function startCaptureStage() {
+    if (!room || !canStart) return
+
+    const { error: updateError } = await supabase
+      .from("dual_rooms")
+      .update({
+        status: "ready",
+        current_shot: 0,
+        countdown_starts_at: null,
       })
+      .eq("id", room.id)
 
-      localStreamRef.current = stream
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream
-      }
-
-      setCameraReady(true)
-
-      if (peerRef.current) {
-        stream.getTracks().forEach((track) => {
-          peerRef.current?.addTrack(track, stream)
-        })
-      }
-
-      setTimeout(() => {
-        broadcastCameraReady().catch(console.error)
-      }, 400)
-    } catch (err) {
-      console.error(err)
-      setCameraReady(false)
-      setError("Camera access is required for Dual Mode.")
-    }
-  }
-
-  function createPeer() {
-    if (peerRef.current) return peerRef.current
-
-    const peer = new RTCPeerConnection(rtcConfig)
-
-    remoteStreamRef.current = new MediaStream()
-
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStreamRef.current
-    }
-
-    peer.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStreamRef.current?.addTrack(track)
-      })
-
-      setRemoteReady(true)
-    }
-
-    peer.onicecandidate = async (event) => {
-      if (!event.candidate || !channelRef.current || !currentRole) return
-
-      await channelRef.current.send({
-        type: "broadcast",
-        event: "webrtc-ice",
-        payload: {
-          from: currentUserId,
-          role: currentRole,
-          candidate: event.candidate.toJSON(),
-        } satisfies SignalPayload,
-      })
-    }
-
-    peer.onconnectionstatechange = () => {
-      setConnectionState(peer.connectionState)
-    }
-
-    localStreamRef.current?.getTracks().forEach((track) => {
-      peer.addTrack(track, localStreamRef.current as MediaStream)
-    })
-
-    peerRef.current = peer
-    return peer
-  }
-
-  async function makeOffer() {
-    if (!channelRef.current || !currentRole || madeOfferRef.current) return
-    if (!isHost || !partnerMember || !cameraReady || !remoteCameraReady) return
-
-    const peer = createPeer()
-    madeOfferRef.current = true
-
-    const offer = await peer.createOffer()
-    await peer.setLocalDescription(offer)
-
-    await channelRef.current.send({
-      type: "broadcast",
-      event: "webrtc-offer",
-      payload: {
-        from: currentUserId,
-        role: currentRole,
-        sdp: offer,
-      } satisfies SignalPayload,
-    })
-  }
-
-  async function handleOffer(payload: SignalPayload) {
-    if (payload.from === currentUserId || !payload.sdp || !currentRole) return
-    if (currentRole !== "partner" || !cameraReady) return
-
-    const peer = createPeer()
-
-    await peer.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-
-    const answer = await peer.createAnswer()
-    await peer.setLocalDescription(answer)
-
-    await channelRef.current?.send({
-      type: "broadcast",
-      event: "webrtc-answer",
-      payload: {
-        from: currentUserId,
-        role: currentRole,
-        sdp: answer,
-      } satisfies SignalPayload,
-    })
-  }
-
-  async function handleAnswer(payload: SignalPayload) {
-    if (payload.from === currentUserId || !payload.sdp) return
-    if (!peerRef.current) return
-
-    await peerRef.current.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-  }
-
-  async function handleIce(payload: SignalPayload) {
-    if (payload.from === currentUserId || !payload.candidate) return
-    if (!peerRef.current) return
-
-    try {
-      await peerRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate))
-    } catch (err) {
-      console.error("ICE candidate error:", err)
-    }
-  }
-
-  function storeCapturedPhoto(role: DualRoomMemberRole, shot: number, imageData: string) {
-    const index = shot - 1
-
-    if (role === "host") {
-      const next = [...hostPhotosRef.current]
-      next[index] = imageData
-      hostPhotosRef.current = next.filter(Boolean)
-      setHostPhotos([...hostPhotosRef.current])
-    } else {
-      const next = [...partnerPhotosRef.current]
-      next[index] = imageData
-      partnerPhotosRef.current = next.filter(Boolean)
-      setPartnerPhotos([...partnerPhotosRef.current])
-    }
-  }
-
-  async function handlePhotoCaptured(payload: PhotoPayload) {
-    if (payload.from === currentUserId) return
-
-    storeCapturedPhoto(payload.role, payload.shot, payload.imageData)
-  }
-
-  function captureLocalPhoto() {
-    const video = localVideoRef.current
-    if (!video || video.readyState < 2) return null
-
-    const canvas = document.createElement("canvas")
-    canvas.width = 720
-    canvas.height = 540
-
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return null
-
-    const videoRatio = video.videoWidth / video.videoHeight
-    const canvasRatio = canvas.width / canvas.height
-
-    let sx = 0
-    let sy = 0
-    let sw = video.videoWidth
-    let sh = video.videoHeight
-
-    if (videoRatio > canvasRatio) {
-      sw = video.videoHeight * canvasRatio
-      sx = (video.videoWidth - sw) / 2
-    } else {
-      sh = video.videoWidth / canvasRatio
-      sy = (video.videoHeight - sh) / 2
-    }
-
-    ctx.save()
-    ctx.translate(canvas.width, 0)
-    ctx.scale(-1, 1)
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
-    ctx.restore()
-
-    return canvas.toDataURL("image/jpeg", 0.82)
-  }
-
-  async function captureShot(shot: number) {
-    if (!currentRole || !channelRef.current) return
-
-    setCapturingShot(shot)
-
-    const imageData = captureLocalPhoto()
-
-    if (!imageData) {
-      setError("We could not capture your photo. Please keep your camera open.")
-      setCapturingShot(null)
+    if (updateError) {
+      setError("We could not start the capture stage.")
       return
     }
 
-    storeCapturedPhoto(currentRole, shot, imageData)
+    window.location.href = `/booth/dual/capture/${room.room_code}`
+  }
 
-    await channelRef.current.send({
-      type: "broadcast",
-      event: "photo-captured",
-      payload: {
-        from: currentUserId,
-        role: currentRole,
-        shot,
-        imageData,
-      } satisfies PhotoPayload,
-    })
-
-    setTimeout(() => {
-      setCapturingShot(null)
-    }, 700)
-
-    if (isHost && room) {
-      setTimeout(async () => {
-        if (shot < MAX_DUAL_SHOTS) {
-          await supabase
-            .from("dual_rooms")
-            .update({
-              status: "countdown",
-              current_shot: shot + 1,
-              countdown_starts_at: new Date(Date.now() + 4200).toISOString(),
-            })
-            .eq("id", room.id)
-        } else {
-          await supabase
-            .from("dual_rooms")
-            .update({
-              status: "completed",
-              current_shot: MAX_DUAL_SHOTS,
-              countdown_starts_at: null,
-            })
-            .eq("id", room.id)
-        }
-      }, 1500)
-    }
+  async function refreshRoom() {
+    setLoading(true)
+    await fetchRoomState()
+    setLoading(false)
   }
 
   useEffect(() => {
-    ensureJoined()
-
-    return () => {
-      localStreamRef.current?.getTracks().forEach((track) => track.stop())
-      peerRef.current?.close()
-
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-      }
-    }
+    joinRoom()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomCode])
 
   useEffect(() => {
-    if (!room?.id) return
+    if (!room?.id || !currentUserId) return
 
     const channel = supabase
-      .channel(`dual-room-${room.id}`)
-      .on("broadcast", { event: "camera-ready" }, ({ payload }) => {
-        if (payload?.from !== currentUserId) {
-          setRemoteCameraReady(true)
-        }
+      .channel(`dual-room-presence-${room.id}`, {
+        config: {
+          presence: {
+            key: currentUserId,
+          },
+        },
       })
-      .on("broadcast", { event: "webrtc-offer" }, async ({ payload }) => {
-        await handleOffer(payload as SignalPayload)
-      })
-      .on("broadcast", { event: "webrtc-answer" }, async ({ payload }) => {
-        await handleAnswer(payload as SignalPayload)
-      })
-      .on("broadcast", { event: "webrtc-ice" }, async ({ payload }) => {
-        await handleIce(payload as SignalPayload)
-      })
-      .on("broadcast", { event: "photo-captured" }, async ({ payload }) => {
-        await handlePhotoCaptured(payload as PhotoPayload)
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState()
+        const ids = Object.keys(state)
+        setOnlineUserIds(ids)
       })
       .on(
         "postgres_changes",
@@ -553,142 +278,40 @@ export default function DualRoomClient({ roomCode }: Props) {
           await fetchRoomState()
         }
       )
-      .subscribe()
-
-    channelRef.current = channel
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({
+            user_id: currentUserId,
+            role: currentRole,
+            online_at: new Date().toISOString(),
+          })
+        }
+      })
 
     return () => {
+      channel.untrack()
       supabase.removeChannel(channel)
-      channelRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room?.id, currentUserId, currentRole, cameraReady])
+  }, [room?.id, currentUserId, currentRole, fetchRoomState, supabase])
 
   useEffect(() => {
-    if (cameraReady && partnerMember) {
-      broadcastCameraReady().catch(console.error)
+    if (!room) return
+
+    if (room.status === "ready" || room.status === "countdown") {
+      window.location.href = `/booth/dual/capture/${room.room_code}`
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraReady, partnerMember?.id])
-
-  useEffect(() => {
-    if (!isHost || !partnerMember || !cameraReady || !remoteCameraReady) return
-
-    const timer = window.setTimeout(() => {
-      makeOffer().catch((err) => {
-        console.error(err)
-        setError("We couldn’t connect the live preview.")
-      })
-    }, 800)
-
-    return () => window.clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHost, partnerMember?.id, cameraReady, remoteCameraReady])
-
-  useEffect(() => {
-    if (!room || room.status !== "countdown") return
-    if (!room.countdown_starts_at || !cameraReady || !currentRole) return
-
-    const shot = room.current_shot
-    if (!shot || scheduledShotRef.current === shot) return
-
-    scheduledShotRef.current = shot
-
-    const captureAt = new Date(room.countdown_starts_at).getTime()
-    const delay = Math.max(captureAt - Date.now(), 0)
-
-    const timer = window.setTimeout(() => {
-      captureShot(shot).catch(console.error)
-    }, delay)
-
-    return () => window.clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room?.status, room?.current_shot, room?.countdown_starts_at, cameraReady, currentRole])
-
-  useEffect(() => {
-    const ready =
-      hostPhotos.length >= MAX_DUAL_SHOTS && partnerPhotos.length >= MAX_DUAL_SHOTS
-
-    if (!ready) return
-
-    const data = {
-      roomCode,
-      hostName: hostMember?.display_name || "Host",
-      partnerName: partnerMember?.display_name || "Partner",
-      hostPhotos: hostPhotos.slice(0, MAX_DUAL_SHOTS),
-      partnerPhotos: partnerPhotos.slice(0, MAX_DUAL_SHOTS),
-      createdAt: new Date().toISOString(),
-    }
-
-    sessionStorage.setItem(DUAL_RESULT_KEY, JSON.stringify(data))
-    window.location.href = "/booth/dual/result"
-  }, [hostPhotos, partnerPhotos, roomCode, hostMember, partnerMember])
-
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(inviteLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    } catch {
-      setError("We couldn’t copy the invite link.")
-    }
-  }
-
-  async function toggleReady() {
-    if (!currentMember) return
-
-    try {
-      await supabase
-        .from("dual_room_members")
-        .update({ is_ready: !currentMember.is_ready })
-        .eq("id", currentMember.id)
-    } catch (err) {
-      console.error(err)
-      setError("We couldn’t update your ready status.")
-    }
-  }
-
-  async function startSession() {
-    if (!room || !isHost || !bothReady) return
-
-    try {
-      scheduledShotRef.current = null
-
-      await supabase
-        .from("dual_rooms")
-        .update({
-          status: "countdown",
-          countdown_starts_at: new Date(Date.now() + 5000).toISOString(),
-          current_shot: 1,
-        })
-        .eq("id", room.id)
-    } catch (err) {
-      console.error(err)
-      setError("We couldn’t start the session.")
-    }
-  }
-
-  async function refreshState() {
-    try {
-      setLoading(true)
-      await fetchRoomState()
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [room])
 
   if (loading) {
     return (
       <main className="amoura-page flex min-h-screen items-center justify-center px-6">
-        <div className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-8 text-center backdrop-blur-xl">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-amoura-red-soft" />
-          <p className="mt-4 text-base font-semibold text-amoura-cream">
-            Joining your dual session...
-          </p>
-          <p className="mt-2 text-sm text-amoura-muted">
-            Preparing the room and checking your camera.
+        <div className="w-full max-w-md rounded-[1.75rem] border border-amoura-red-soft/20 bg-black/45 p-8 text-center backdrop-blur-xl">
+          <Loader2 className="mx-auto h-9 w-9 animate-spin text-amoura-red-soft" />
+          <h1 className="amoura-serif mt-5 text-3xl text-amoura-cream">
+            Opening your room...
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-amoura-muted">
+            Preparing your private dual photobooth.
           </p>
         </div>
       </main>
@@ -701,7 +324,7 @@ export default function DualRoomClient({ roomCode }: Props) {
         <div className="max-w-md rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-8 text-center backdrop-blur-xl">
           <Users className="mx-auto h-10 w-10 text-amoura-red-soft" />
           <h1 className="amoura-serif mt-5 text-3xl text-amoura-cream">
-            Session unavailable
+            Room unavailable
           </h1>
           <p className="mt-3 text-sm leading-6 text-amoura-muted">
             {error || "This room is no longer available."}
@@ -720,7 +343,7 @@ export default function DualRoomClient({ roomCode }: Props) {
 
   return (
     <main className="amoura-page min-h-screen px-4 py-5 sm:px-6 lg:px-8">
-      <section className="mx-auto max-w-7xl">
+      <section className="mx-auto max-w-6xl">
         <header className="rounded-[1.5rem] border border-amoura-red-soft/20 bg-black/45 px-4 py-3 backdrop-blur-xl sm:px-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link
@@ -731,129 +354,83 @@ export default function DualRoomClient({ roomCode }: Props) {
               Dual Mode
             </Link>
 
-            <div className="flex items-center gap-2 rounded-full border border-amoura-red-soft/15 bg-black/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amoura-muted">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-amoura-red-soft" />
-              {room.room_code}
+            <div className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amoura-red-soft">
+                Waiting Room
+              </p>
+              <p className="text-xs text-amoura-muted">{room.room_code}</p>
             </div>
 
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-[0.18em] text-amoura-muted">
-                Expires in
-              </p>
-              <p className="text-lg font-semibold text-amoura-red-soft">
-                {timeLeft}
-              </p>
-            </div>
+            <button
+              onClick={refreshRoom}
+              className="inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/30 px-4 py-2 text-xs font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Refresh
+            </button>
           </div>
         </header>
 
-        {room.status === "countdown" && countdown !== null ? (
-          <div className="mt-4 rounded-[1.5rem] border border-amoura-red-soft/25 bg-amoura-red/10 px-5 py-4 text-center backdrop-blur-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amoura-red-soft">
-              Shot {room.current_shot} of {MAX_DUAL_SHOTS}
-            </p>
-            <div className="amoura-serif mt-2 animate-pulse text-5xl text-amoura-cream">
-              {countdown > 0 ? countdown : "Smile!"}
-            </div>
-          </div>
-        ) : null}
-
-        {capturingShot ? (
-          <div className="mt-4 rounded-[1.5rem] border border-amoura-red-soft/25 bg-black/45 px-5 py-4 text-center backdrop-blur-xl">
-            <p className="text-sm font-semibold text-amoura-cream">
-              Captured shot {capturingShot}. Preparing next pose...
-            </p>
-          </div>
-        ) : null}
-
-        <section className="mt-4 grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-          <section className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-4 backdrop-blur-xl sm:p-5">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amoura-red-soft">
-                  Live Preview
-                </p>
-                <h1 className="amoura-serif mt-1 text-3xl text-amoura-cream">
-                  Pose together
-                </h1>
-              </div>
-
-              <button
-                onClick={copyLink}
-                className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Link copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" />
-                    Copy Invite Link
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <VideoCard
-                label="You"
-                name={currentMember?.display_name || "You"}
-                ready={!!currentMember?.is_ready}
-                connected
-                videoRef={localVideoRef}
-                isLocal
-                cameraReady={cameraReady}
-                onStartCamera={startCamera}
-              />
-
-              <VideoCard
-                label="Partner"
-                name={partnerMember?.display_name || "Waiting for partner"}
-                ready={!!partnerMember?.is_ready}
-                connected={remoteReady || connectionState === "connected"}
-                videoRef={remoteVideoRef}
-                waiting={!partnerMember}
-                cameraReady={remoteReady}
-              />
-            </div>
-
-            <div className="mt-4 break-all rounded-2xl border border-amoura-red-soft/15 bg-black/30 px-4 py-4 text-sm text-amoura-cream">
-              {inviteLink}
-            </div>
-          </section>
-
-          <aside className="rounded-[1.6rem] border border-amoura-red-soft/20 bg-black/45 p-5 backdrop-blur-xl sm:p-6">
+        <section className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <section className="rounded-[1.75rem] border border-amoura-red-soft/20 bg-black/45 p-5 backdrop-blur-xl sm:p-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/20 bg-amoura-red/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-amoura-red-soft">
               <Heart className="h-4 w-4" />
-              Waiting Room
+              Invite your partner
             </div>
 
-            <h2 className="amoura-serif mt-5 text-3xl text-amoura-cream">
-              Ready when you are
-            </h2>
+            <h1 className="amoura-serif mt-5 text-4xl leading-none text-amoura-cream sm:text-5xl">
+              Waiting for your partner
+            </h1>
 
-            <p className="mt-3 text-sm leading-7 text-amoura-muted">
-              See each other first, decide your pose, then start the synced
-              countdown for 3 dual shots.
+            <p className="mt-4 max-w-xl text-sm leading-7 text-amoura-muted">
+              Share this private link. Once both of you are ready, the host can
+              move to the capture stage where the cameras fill the screen.
             </p>
 
-            <div className="mt-6 space-y-3">
-              <StatusRow label="Your camera" value={cameraReady} />
-              <StatusRow label="Partner joined" value={!!partnerMember} />
-              <StatusRow
-                label="Live connection"
-                value={remoteReady || connectionState === "connected"}
+            <div className="mt-6 rounded-2xl border border-amoura-red-soft/15 bg-black/35 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amoura-muted">
+                Invite Link
+              </p>
+              <p className="mt-2 break-all text-sm text-amoura-cream">
+                {inviteLink}
+              </p>
+            </div>
+
+            <button
+              onClick={copyLink}
+              className="amoura-btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-4 text-sm font-semibold"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Link copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copy Invite Link
+                </>
+              )}
+            </button>
+          </section>
+
+          <aside className="rounded-[1.75rem] border border-amoura-red-soft/20 bg-[radial-gradient(circle_at_top,#25070f_0%,#0a0507_40%,#040404_100%)] p-5 backdrop-blur-xl sm:p-7">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <MemberStatusCard
+                title="Host"
+                name={hostMember?.display_name || "Host"}
+                online={hostOnline}
+                ready={!!hostMember?.is_ready}
+                isYou={hostMember?.user_id === currentUserId}
               />
-              <StatusRow label="Host ready" value={!!hostMember?.is_ready} />
-              <StatusRow label="Partner ready" value={!!partnerMember?.is_ready} />
-              <StatusRow
-                label="Photos captured"
-                value={
-                  hostPhotos.length >= MAX_DUAL_SHOTS &&
-                  partnerPhotos.length >= MAX_DUAL_SHOTS
-                }
+
+              <MemberStatusCard
+                title="Partner"
+                name={partnerMember?.display_name || "Waiting..."}
+                online={partnerOnline}
+                ready={!!partnerMember?.is_ready}
+                isYou={partnerMember?.user_id === currentUserId}
+                waiting={!partnerMember}
               />
             </div>
 
@@ -863,20 +440,30 @@ export default function DualRoomClient({ roomCode }: Props) {
               </div>
             ) : null}
 
-            <div className="mt-6 grid gap-3">
-              {!cameraReady ? (
-                <button
-                  onClick={startCamera}
-                  className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-5 py-4 text-sm font-semibold"
-                >
-                  <Camera className="h-4 w-4" />
-                  Allow Camera
-                </button>
-              ) : null}
+            {!partnerMember ? (
+              <div className="mt-5 rounded-2xl border border-amoura-red-soft/15 bg-black/30 p-4 text-sm leading-6 text-amoura-muted">
+                Partner has not entered yet. Keep this room open and send the
+                invite link.
+              </div>
+            ) : !partnerOnline ? (
+              <div className="mt-5 rounded-2xl border border-amber-300/15 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
+                Partner is offline. Waiting for them to reconnect.
+              </div>
+            ) : bothReady ? (
+              <div className="mt-5 rounded-2xl border border-emerald-300/15 bg-emerald-500/10 p-4 text-sm leading-6 text-emerald-100">
+                Both of you are ready. Start the capture stage when you are set.
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-amoura-red-soft/15 bg-black/30 p-4 text-sm leading-6 text-amoura-muted">
+                Click ready when you are prepared. The host starts the 3-shot
+                session.
+              </div>
+            )}
 
+            <div className="mt-6 grid gap-3">
               <button
                 onClick={toggleReady}
-                disabled={!currentMember || !cameraReady}
+                disabled={!currentMember}
                 className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                   currentMember?.is_ready
                     ? "border border-amoura-red-soft/20 bg-black/30 text-amoura-cream hover:border-amoura-red-soft/45"
@@ -891,33 +478,29 @@ export default function DualRoomClient({ roomCode }: Props) {
                 ) : (
                   <>
                     <Heart className="h-4 w-4" />
-                    Mark as Ready
+                    I’m Ready
                   </>
                 )}
               </button>
 
               {isHost ? (
                 <button
-                  onClick={startSession}
-                  disabled={!bothReady || !cameraReady || !remoteReady}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/30 px-5 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={startCaptureStage}
+                  disabled={!canStart}
+                  className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-5 py-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Send className="h-4 w-4" />
-                  Start 3-Shot Countdown
+                  <Camera className="h-4 w-4" />
+                  Enter Capture Stage
                 </button>
               ) : (
-                <div className="rounded-2xl border border-amoura-red-soft/15 bg-black/30 px-4 py-4 text-sm text-amoura-muted">
-                  Only the host can start once both are ready.
+                <div className="rounded-full border border-amoura-red-soft/20 bg-black/30 px-5 py-4 text-center text-sm font-semibold text-amoura-muted">
+                  Waiting for host to start
                 </div>
               )}
 
-              <button
-                onClick={refreshState}
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-transparent px-5 py-4 text-sm font-semibold text-amoura-cream transition hover:border-amoura-red-soft/45"
-              >
-                <RefreshCcw className="h-4 w-4" />
-                Refresh Room
-              </button>
+              <p className="text-center text-xs text-amoura-muted">
+                Room expires in {timeLeft}
+              </p>
             </div>
           </aside>
         </section>
@@ -926,131 +509,62 @@ export default function DualRoomClient({ roomCode }: Props) {
   )
 }
 
-function VideoCard({
-  label,
+function MemberStatusCard({
+  title,
   name,
+  online,
   ready,
-  connected,
-  videoRef,
-  isLocal = false,
+  isYou,
   waiting = false,
-  cameraReady,
-  onStartCamera,
 }: {
-  label: string
+  title: string
   name: string
+  online: boolean
   ready: boolean
-  connected: boolean
-  videoRef: RefObject<HTMLVideoElement | null>
-  isLocal?: boolean
+  isYou: boolean
   waiting?: boolean
-  cameraReady: boolean
-  onStartCamera?: () => void
 }) {
   return (
-    <div className="overflow-hidden rounded-[1.5rem] border border-amoura-red-soft/20 bg-black/35">
-      <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amoura-muted">
-            {label}
-          </p>
-          <p className="text-sm font-semibold text-amoura-cream">{name}</p>
-        </div>
+    <div className="rounded-2xl border border-amoura-red-soft/15 bg-black/30 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amoura-muted">
+        {title}
+      </p>
+      <p className="mt-2 truncate text-lg font-semibold text-amoura-cream">
+        {name}
+      </p>
 
-        <div
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            ready
-              ? "bg-emerald-500/10 text-emerald-300"
-              : "bg-zinc-500/10 text-zinc-300"
+      <div className="mt-4 flex flex-wrap gap-2">
+        <span
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+            waiting
+              ? "bg-zinc-500/10 text-zinc-300"
+              : online
+                ? "bg-emerald-500/10 text-emerald-300"
+                : "bg-amber-500/10 text-amber-200"
+          }`}
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${
+              waiting ? "bg-zinc-400" : online ? "bg-emerald-400" : "bg-amber-300"
+            }`}
+          />
+          {waiting ? "Waiting" : online ? "Online" : "Offline"}
+        </span>
+
+        <span
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+            ready ? "bg-amoura-red/15 text-amoura-red-soft" : "bg-zinc-500/10 text-zinc-300"
           }`}
         >
           {ready ? "Ready" : "Not ready"}
-        </div>
-      </div>
+        </span>
 
-      <div className="relative aspect-video bg-black">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal}
-          className={`h-full w-full object-cover ${isLocal ? "scale-x-[-1]" : ""}`}
-        />
-
-        {!cameraReady ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 px-6 text-center">
-            {waiting ? (
-              <>
-                <UserCircle2 className="h-12 w-12 text-amoura-red-soft" />
-                <p className="mt-4 text-sm font-semibold text-amoura-cream">
-                  Waiting for partner
-                </p>
-                <div className="mt-3 flex gap-1">
-                  <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-amoura-red-soft" />
-                  <span
-                    className="h-2.5 w-2.5 animate-bounce rounded-full bg-amoura-red-soft"
-                    style={{ animationDelay: "0.12s" }}
-                  />
-                  <span
-                    className="h-2.5 w-2.5 animate-bounce rounded-full bg-amoura-red-soft"
-                    style={{ animationDelay: "0.24s" }}
-                  />
-                </div>
-              </>
-            ) : isLocal ? (
-              <>
-                <VideoOff className="h-12 w-12 text-amoura-red-soft" />
-                <p className="mt-4 text-sm font-semibold text-amoura-cream">
-                  Camera access required
-                </p>
-                <button
-                  onClick={onStartCamera}
-                  className="amoura-btn-primary mt-4 inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold"
-                >
-                  <Camera className="h-4 w-4" />
-                  Allow Camera
-                </button>
-              </>
-            ) : (
-              <>
-                <Video className="h-12 w-12 text-amoura-red-soft" />
-                <p className="mt-4 text-sm font-semibold text-amoura-cream">
-                  Connecting live preview
-                </p>
-                <p className="mt-2 text-xs text-amoura-muted">
-                  Ask your partner to allow camera.
-                </p>
-              </>
-            )}
-          </div>
+        {isYou ? (
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-amoura-cream">
+            You
+          </span>
         ) : null}
-
-        <div className="absolute left-3 top-3 rounded-full border border-white/10 bg-black/50 px-3 py-1 text-xs font-semibold text-amoura-cream backdrop-blur">
-          {connected ? "Connected" : "Waiting"}
-        </div>
       </div>
-    </div>
-  )
-}
-
-function StatusRow({ label, value }: { label: string; value: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-amoura-red-soft/10 bg-black/25 px-4 py-3">
-      <p className="text-sm text-amoura-muted">{label}</p>
-      <span
-        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-          value
-            ? "bg-emerald-500/10 text-emerald-300"
-            : "bg-zinc-500/10 text-zinc-300"
-        }`}
-      >
-        <span
-          className={`h-2 w-2 rounded-full ${
-            value ? "bg-emerald-400" : "bg-zinc-400"
-          }`}
-        />
-        {value ? "Yes" : "No"}
-      </span>
     </div>
   )
 }

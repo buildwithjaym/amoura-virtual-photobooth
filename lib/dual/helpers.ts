@@ -53,12 +53,3 @@ export function getTimeLeft(expiresAt: string) {
 
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
 }
-
-export function getCountdownSeconds(startAt: string | null) {
-  if (!startAt) return null
-
-  const diff = new Date(startAt).getTime() - Date.now()
-  if (diff <= 0) return 0
-
-  return Math.ceil(diff / 1000)
-}

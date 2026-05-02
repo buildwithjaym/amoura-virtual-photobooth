@@ -4,6 +4,7 @@ export type DualRoomStatus =
   | "ready"
   | "countdown"
   | "capturing"
+  | "between_shots"
   | "completed"
   | "expired"
   | "cancelled"

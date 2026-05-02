@@ -151,3 +151,25 @@ using (user_id = auth.uid());
 
 alter publication supabase_realtime add table public.dual_rooms;
 alter publication supabase_realtime add table public.dual_room_members;
+
+
+
+alter table public.dual_rooms
+drop constraint if exists dual_rooms_status_check;
+
+alter table public.dual_rooms
+add constraint dual_rooms_status_check check (
+  status = any (
+    array[
+      'waiting'::text,
+      'partner_joined'::text,
+      'ready'::text,
+      'countdown'::text,
+      'capturing'::text,
+      'between_shots'::text,
+      'completed'::text,
+      'expired'::text,
+      'cancelled'::text
+    ]
+  )
+);
