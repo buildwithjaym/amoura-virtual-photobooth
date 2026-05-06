@@ -512,7 +512,7 @@ const Header = memo(
               </a>
             ))}
           </div>
-
+            
           <div className="hidden lg:block">
             <Link
               href="/create-account"
