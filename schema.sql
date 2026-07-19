@@ -345,3 +345,37 @@ $$;
 
 revoke all on function public.get_admin_dashboard_stats() from public;
 grant execute on function public.get_admin_dashboard_stats() to authenticated;
+
+
+-- =====================================================
+-- Create the pings table
+-- =====================================================
+CREATE TABLE IF NOT EXISTS public.pings (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    value INTEGER NOT NULL CHECK (value = 1),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- Enable Row Level Security (RLS)
+-- =====================================================
+ALTER TABLE public.pings
+ENABLE ROW LEVEL SECURITY;
+
+-- =====================================================
+-- Policy: Allow anonymous users to insert records
+-- =====================================================
+CREATE POLICY "allow insert"
+ON public.pings
+FOR INSERT
+TO anon
+WITH CHECK (true);
+
+-- =====================================================
+-- Policy: Allow anonymous users to read records
+-- =====================================================
+CREATE POLICY "allow read"
+ON public.pings
+FOR SELECT
+TO anon
+USING (true);
