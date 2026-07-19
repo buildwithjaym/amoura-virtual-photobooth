@@ -201,7 +201,7 @@ export default function CreateSessionClient({ displayName }: Props) {
                       Create Session
                     </p>
                     <p className="text-sm text-amoura-muted">
-                      Your room expires after 30 minutes
+                      Your room expires after 5 minutes
                     </p>
                   </div>
                 </div>
