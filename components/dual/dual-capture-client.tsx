@@ -92,6 +92,7 @@ const rtcConfig: RTCConfiguration = {
     {
       urls: "stun:stun.relay.metered.ca:80",
     },
+
     ...(hasTurnServer
       ? [
           {
@@ -116,10 +117,10 @@ const rtcConfig: RTCConfiguration = {
           },
         ]
       : []),
+
   ],
   iceCandidatePoolSize: 10,
 }
-
 export default function DualCaptureClient({ roomCode }: Props) {
   const supabase = useMemo(() => createClient(), [])
 
@@ -1393,9 +1394,8 @@ export default function DualCaptureClient({ roomCode }: Props) {
 
             <div className="hidden items-center gap-2 rounded-full border border-amoura-red-soft/15 bg-black/30 px-3 py-2 text-xs text-amoura-muted sm:flex">
               <span
-                className={`h-2 w-2 rounded-full ${
-                  liveConnected ? "bg-emerald-400" : "bg-zinc-400"
-                }`}
+                className={`h-2 w-2 rounded-full ${liveConnected ? "bg-emerald-400" : "bg-zinc-400"
+                  }`}
               />
               {liveConnected ? "Live" : "Syncing"}
             </div>
@@ -1655,11 +1655,10 @@ function CaptureCenterOverlay({
                 Remote: {remoteCameraReady ? "ready" : "waiting"}
               </span>
               <span
-                className={`rounded-full border px-2 py-1 ${
-                  hasTurnServer
-                    ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
-                    : "border-amber-400/20 bg-amber-500/10 text-amber-200"
-                }`}
+                className={`rounded-full border px-2 py-1 ${hasTurnServer
+                  ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
+                  : "border-amber-400/20 bg-amber-500/10 text-amber-200"
+                  }`}
               >
                 TURN: {hasTurnServer ? "on" : "missing"}
               </span>
@@ -1700,13 +1699,12 @@ function ProgressChip({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 font-semibold transition ${
-        done
-          ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
-          : active
-            ? "border-amoura-red-soft/40 bg-amoura-red/15 text-amoura-cream"
-            : "border-white/10 bg-white/5 text-amoura-muted"
-      }`}
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 font-semibold transition ${done
+        ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-300"
+        : active
+          ? "border-amoura-red-soft/40 bg-amoura-red/15 text-amoura-cream"
+          : "border-white/10 bg-white/5 text-amoura-muted"
+        }`}
     >
       {done ? (
         <Check className="h-3.5 w-3.5" />
