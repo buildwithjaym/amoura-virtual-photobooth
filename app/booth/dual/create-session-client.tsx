@@ -48,9 +48,9 @@ export default function CreateSessionClient({ displayName }: Props) {
         router.push("/create-account")
         return
       }
-      {/*From 30 minutes to 5 minutes*/}
+      {/*From 30 minutes to 10 minutes*/}
       const newRoomCode = createRoomCode()
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
       const { data: room, error: roomError } = await supabase
         .from("dual_rooms")
@@ -201,7 +201,7 @@ export default function CreateSessionClient({ displayName }: Props) {
                       Create Session
                     </p>
                     <p className="text-sm text-amoura-muted">
-                      Your room expires after 5 minutes
+                      Your room expires after 10 minutes
                     </p>
                   </div>
                 </div>
