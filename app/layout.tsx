@@ -150,7 +150,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} bg-[#0B0507] text-amoura-cream antialiased`}
       >
         <PWARegister />
-        1<Analytics />
+        <Analytics />
         {children}
       </body>
     </html>
