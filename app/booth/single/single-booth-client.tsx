@@ -32,6 +32,7 @@ export default function SingleBoothClient() {
   const [photos, setPhotos] = useState<string[]>([])
   const [isCapturing, setIsCapturing] = useState(false)
   const [captureMessage, setCaptureMessage] = useState("")
+  const [showFlash, setShowFlash] = useState(false)
 
   const isComplete = photos.length >= MAX_SHOTS
   const nextShotNumber = Math.min(photos.length + 1, MAX_SHOTS)
@@ -295,7 +296,14 @@ export default function SingleBoothClient() {
       return [...current, image]
     })
 
+    triggerFlash()
+
     return true
+  }
+
+  function triggerFlash() {
+    setShowFlash(true)
+    window.setTimeout(() => setShowFlash(false), 220)
   }
 
   function retakeAll() {
@@ -303,6 +311,7 @@ export default function SingleBoothClient() {
     setCountdown(null)
     setIsCapturing(false)
     setCaptureMessage("")
+    setShowFlash(false)
     sessionStorage.removeItem(STORAGE_KEY)
   }
 
@@ -448,6 +457,13 @@ export default function SingleBoothClient() {
                     </div>
                   </div>
                 )}
+
+                <div
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute inset-0 z-30 bg-white transition-opacity duration-150 ease-out ${
+                    showFlash ? "opacity-90" : "opacity-0"
+                  }`}
+                />
 
                 {isComplete && (
                   <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-amoura-red-soft/25 bg-black/75 p-3 text-center backdrop-blur-md sm:inset-x-4 sm:bottom-4 sm:rounded-3xl sm:p-4">
