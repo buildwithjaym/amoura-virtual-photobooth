@@ -187,13 +187,13 @@ Amoura is designed as a **luxury experience**, not a utility app.
 ### Phase 2
 
 * [ ] Premium system (PayMongo)
-* [ ] Additional themes
+* [X] Additional themes
 * [ ] UI polish
 
 ### Phase 3
 
-* [ ] Dual Mode (remote sessions)
-* [ ] Realtime sync
+* [X] Dual Mode (remote sessions)
+* [X] Realtime sync
 
 ### Phase 4
 

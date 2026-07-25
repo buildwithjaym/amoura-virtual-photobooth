@@ -330,40 +330,40 @@ export default function SingleBoothClient() {
 
   return (
     <main className="amoura-page min-h-screen overflow-hidden">
-      <section className="relative min-h-screen px-4 py-5 sm:px-6 lg:px-8">
+      <section className="relative min-h-screen px-3 py-3 sm:px-6 sm:py-5 lg:px-8">
         <div className="pointer-events-none absolute right-[-18%] top-[-12%] h-[420px] w-[420px] rounded-full bg-amoura-red/25 blur-[130px]" />
         <div className="pointer-events-none absolute left-[-18%] bottom-[-12%] h-[320px] w-[320px] rounded-full bg-amoura-red-deep/20 blur-[120px]" />
 
-        <div className="relative mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-7xl flex-col gap-5">
-          <header className="flex items-center justify-between rounded-[1.5rem] border border-amoura-red-soft/20 bg-black/45 px-4 py-3 backdrop-blur-xl sm:px-5">
+        {/* pb-28 reserves room for the fixed mobile action bar; lg:pb-0 removes it once the sidebar takes over */}
+        <div className="relative mx-auto flex min-h-[calc(100vh-1.5rem)] w-full max-w-7xl flex-col gap-4 pb-28 sm:min-h-[calc(100vh-2.5rem)] sm:gap-5 lg:pb-0">
+          <header className="flex items-center justify-between rounded-2xl border border-amoura-red-soft/20 bg-black/45 px-3 py-2.5 backdrop-blur-xl sm:rounded-[1.5rem] sm:px-5 sm:py-3">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-amoura-muted transition hover:text-amoura-cream"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-amoura-muted transition hover:text-amoura-cream sm:gap-2 sm:text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
               Dashboard
             </Link>
 
             <div className="text-right">
-              <p className="amoura-serif text-2xl leading-none text-amoura-red-soft">
+              <p className="amoura-serif text-lg leading-none text-amoura-red-soft sm:text-2xl">
                 Single Mode
               </p>
-              <p className="text-xs text-amoura-muted">
+              <p className="text-[11px] text-amoura-muted sm:text-xs">
                 {photos.length}/{MAX_SHOTS} photos captured
               </p>
             </div>
           </header>
 
-          <section className="grid flex-1 gap-5 lg:grid-cols-[1fr_0.42fr]">
-            <div className="relative overflow-hidden rounded-[1.75rem] border border-amoura-red-soft/20 bg-black/45 p-3 shadow-[0_0_70px_rgba(194,31,58,0.14)] backdrop-blur-xl sm:p-4">
-              <div className="relative flex min-h-[460px] items-center justify-center overflow-hidden rounded-[1.35rem] border border-white/10 bg-black lg:min-h-[calc(100vh-9rem)]">
+          <section className="grid flex-1 gap-4 sm:gap-5 lg:grid-cols-[1fr_0.42fr]">
+            <div className="relative overflow-hidden rounded-[1.5rem] border border-amoura-red-soft/20 bg-black/45 p-2.5 shadow-[0_0_70px_rgba(194,31,58,0.14)] backdrop-blur-xl sm:rounded-[1.75rem] sm:p-4">
+              <div className="relative flex h-[58svh] min-h-[320px] items-center justify-center overflow-hidden rounded-[1.15rem] border border-white/10 bg-black sm:h-[64svh] sm:rounded-[1.35rem] lg:h-auto lg:min-h-[calc(100vh-9rem)]">
                 <video
                   ref={videoRef}
                   playsInline
                   muted
-                  className={`h-full min-h-[460px] w-full scale-x-[-1] object-cover lg:min-h-[calc(100vh-9rem)] ${
-                    isCameraReady ? "opacity-100" : "opacity-20"
-                  }`}
+                  className={`h-full w-full scale-x-[-1] object-cover ${isCameraReady ? "opacity-100" : "opacity-20"
+                    }`}
                 />
 
                 {(permission === "checking" || isStartingCamera) && (
@@ -417,13 +417,13 @@ export default function SingleBoothClient() {
                   )}
 
                 {isCameraReady && (
-                  <div className="absolute left-4 top-4 z-10 rounded-full border border-white/10 bg-black/60 px-4 py-2 text-xs font-semibold text-amoura-muted backdrop-blur-md">
+                  <div className="absolute left-2.5 top-2.5 z-10 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-[11px] font-semibold text-amoura-muted backdrop-blur-md sm:left-4 sm:top-4 sm:px-4 sm:py-2 sm:text-xs">
                     Photo {nextShotNumber} of {MAX_SHOTS}
                   </div>
                 )}
 
                 {isCameraReady && !isComplete && !isCapturing && (
-                  <div className="absolute bottom-4 left-1/2 z-10 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-3xl border border-amoura-red-soft/20 bg-black/65 p-4 text-center backdrop-blur-md">
+                  <div className="absolute bottom-3 left-1/2 z-10 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-2xl border border-amoura-red-soft/20 bg-black/65 p-3 text-center backdrop-blur-md sm:bottom-4 sm:w-[calc(100%-2rem)] sm:rounded-3xl sm:p-4">
                     <p className="text-sm font-semibold text-amoura-cream">
                       {nextButtonLabel}
                     </p>
@@ -434,7 +434,7 @@ export default function SingleBoothClient() {
                 )}
 
                 {captureMessage && countdown === null && (
-                  <div className="absolute left-1/2 top-4 z-20 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-3xl border border-amoura-red-soft/20 bg-black/70 p-4 text-center backdrop-blur-md">
+                  <div className="absolute left-1/2 top-3 z-20 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-2xl border border-amoura-red-soft/20 bg-black/70 p-3 text-center backdrop-blur-md sm:top-4 sm:w-[calc(100%-2rem)] sm:rounded-3xl sm:p-4">
                     <p className="text-sm font-semibold text-amoura-cream">
                       {captureMessage}
                     </p>
@@ -443,16 +443,16 @@ export default function SingleBoothClient() {
 
                 {countdown !== null && (
                   <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40">
-                    <div className="flex h-36 w-36 items-center justify-center rounded-full border border-amoura-red-soft/40 bg-black/70 text-7xl font-bold text-amoura-cream shadow-[0_0_70px_rgba(194,31,58,0.38)]">
+                    <div className="flex h-28 w-28 items-center justify-center rounded-full border border-amoura-red-soft/40 bg-black/70 text-6xl font-bold text-amoura-cream shadow-[0_0_70px_rgba(194,31,58,0.38)] sm:h-36 sm:w-36 sm:text-7xl">
                       {countdown}
                     </div>
                   </div>
                 )}
 
                 {isComplete && (
-                  <div className="absolute inset-x-4 bottom-4 z-20 rounded-3xl border border-amoura-red-soft/25 bg-black/75 p-4 text-center backdrop-blur-md">
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-amoura-red-soft/30 bg-amoura-red/10">
-                      <Check className="h-6 w-6 text-amoura-red-soft" />
+                  <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-amoura-red-soft/25 bg-black/75 p-3 text-center backdrop-blur-md sm:inset-x-4 sm:bottom-4 sm:rounded-3xl sm:p-4">
+                    <div className="mx-auto mb-2.5 flex h-10 w-10 items-center justify-center rounded-full border border-amoura-red-soft/30 bg-amoura-red/10 sm:mb-3 sm:h-12 sm:w-12">
+                      <Check className="h-5 w-5 text-amoura-red-soft sm:h-6 sm:w-6" />
                     </div>
 
                     <p className="font-semibold text-amoura-cream">
@@ -468,8 +468,9 @@ export default function SingleBoothClient() {
               <canvas ref={canvasRef} className="hidden" />
             </div>
 
-            <aside className="grid gap-5 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
-              <div className="rounded-[1.75rem] border border-amoura-red-soft/20 bg-white/[0.035] p-5">
+            <aside className="grid gap-4 sm:gap-5 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1">
+              {/* Desktop-only guided-capture panel with inline controls */}
+              <div className="hidden rounded-[1.75rem] border border-amoura-red-soft/20 bg-white/[0.035] p-5 lg:block">
                 <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/25 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-amoura-pink">
                   <Sparkles className="h-4 w-4" />
                   Guided capture
@@ -530,9 +531,23 @@ export default function SingleBoothClient() {
                 </div>
               </div>
 
-              <div className="rounded-[1.75rem] border border-amoura-red-soft/20 bg-white/[0.035] p-5">
+              {/* Mobile-only compact intro (no duplicate buttons — those live in the fixed bottom bar) */}
+              <div className="rounded-2xl border border-amoura-red-soft/20 bg-white/[0.035] p-4 lg:hidden">
+                <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amoura-red-soft/25 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-amoura-pink">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Guided capture
+                </div>
+                <p className="text-sm font-semibold text-amoura-cream">
+                  {nextButtonLabel}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-amoura-muted">
+                  {captureGuideText}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-amoura-red-soft/20 bg-white/[0.035] p-4 sm:rounded-[1.75rem] sm:p-5">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold text-amoura-cream">
+                  <h2 className="text-base font-semibold text-amoura-cream sm:text-lg">
                     Captured photos
                   </h2>
 
@@ -544,11 +559,11 @@ export default function SingleBoothClient() {
                 {photos.length === 0 ? (
                   <EmptyShots />
                 ) : (
-                  <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-5 sm:gap-3">
                     {photos.map((photo, index) => (
                       <div
                         key={`${photo}-${index}`}
-                        className="group overflow-hidden rounded-2xl border border-white/5 bg-black/30"
+                        className="group overflow-hidden rounded-xl border border-white/5 bg-black/30 sm:rounded-2xl"
                       >
                         <div className="relative">
                           <img
@@ -561,7 +576,7 @@ export default function SingleBoothClient() {
                             <button
                               type="button"
                               onClick={() => removeShot(index)}
-                              className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-amoura-muted opacity-0 transition hover:text-white group-hover:opacity-100"
+                              className="absolute right-1.5 top-1.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-amoura-muted transition hover:text-white active:opacity-100 sm:right-2 sm:top-2 sm:opacity-0 sm:group-hover:opacity-100"
                               aria-label={`Remove photo ${index + 1}`}
                             >
                               <X className="h-4 w-4" />
@@ -569,7 +584,7 @@ export default function SingleBoothClient() {
                           )}
                         </div>
 
-                        <div className="flex items-center justify-center gap-2 py-2 text-xs text-amoura-muted">
+                        <div className="flex items-center justify-center gap-2 py-1.5 text-[11px] text-amoura-muted sm:py-2 sm:text-xs">
                           Photo {index + 1}
                         </div>
                       </div>
@@ -578,7 +593,7 @@ export default function SingleBoothClient() {
                 )}
               </div>
 
-              <div className="rounded-[1.75rem] border border-amoura-red-soft/20 bg-white/[0.035] p-5">
+              <div className="rounded-2xl border border-amoura-red-soft/20 bg-white/[0.035] p-4 sm:rounded-[1.75rem] sm:p-5">
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-amoura-red-soft" />
                   <div>
@@ -596,6 +611,51 @@ export default function SingleBoothClient() {
           </section>
         </div>
       </section>
+
+      {/* Fixed mobile action bar — only rendering surface for controls below lg */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-amoura-red-soft/20 bg-black/85 px-3 pt-3 backdrop-blur-xl lg:hidden"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}
+      >
+        <div className="mx-auto flex w-full max-w-7xl items-center gap-2">
+          {!isComplete ? (
+            <button
+              onClick={takeNextPhoto}
+              disabled={!isCameraReady || isCapturing}
+              className="amoura-btn-primary inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isCapturing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Capturing photo...
+                </>
+              ) : (
+                <>
+                  <Camera className="h-4 w-4" />
+                  {nextButtonLabel}
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={continueToPreview}
+              className="amoura-btn-primary inline-flex flex-1 items-center justify-center gap-2 rounded-full py-3.5 text-sm font-semibold"
+            >
+              Continue to Strip Design
+            </button>
+          )}
+
+          {photos.length > 0 && (
+            <button
+              onClick={retakeAll}
+              aria-label="Retake all photos"
+              className="inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-amoura-red-soft/20 bg-black/35 text-amoura-cream transition hover:border-amoura-red-soft/45"
+            >
+              <RefreshCcw className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
     </main>
   )
 }
@@ -626,18 +686,18 @@ function CameraPermissionState({
   disabled?: boolean
 }) {
   return (
-    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/85 p-6 text-center">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-amoura-red-soft/25 bg-amoura-red/10">
-        <Camera className="h-8 w-8 text-amoura-red-soft" />
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/85 p-5 text-center sm:p-6">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-amoura-red-soft/25 bg-amoura-red/10 sm:mb-5 sm:h-16 sm:w-16">
+        <Camera className="h-7 w-7 text-amoura-red-soft sm:h-8 sm:w-8" />
       </div>
 
-      <h1 className="amoura-serif text-4xl text-amoura-cream">{title}</h1>
+      <h1 className="amoura-serif text-2xl text-amoura-cream sm:text-4xl">{title}</h1>
 
       <p className="mt-3 max-w-md text-sm leading-6 text-amoura-muted">
         {text}
       </p>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-6 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
         <button
           onClick={onClick}
           disabled={disabled}
@@ -668,7 +728,7 @@ function InfoLine({ text }: { text: string }) {
 
 function EmptyShots() {
   return (
-    <div className="mt-5 rounded-2xl border border-white/5 bg-black/25 p-6 text-center">
+    <div className="mt-4 rounded-2xl border border-white/5 bg-black/25 p-5 text-center sm:mt-5 sm:p-6">
       <Camera className="mx-auto mb-3 h-8 w-8 text-amoura-red-soft" />
       <p className="text-sm leading-6 text-amoura-muted">
         Your photos will appear here after each countdown.
