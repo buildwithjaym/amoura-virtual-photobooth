@@ -3,7 +3,9 @@
 import Link from "next/link"
 import {
   memo,
+  type ReactNode,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -12,13 +14,17 @@ import {
 import {
   ArrowLeft,
   Check,
+  ChevronRight,
   Download,
   Loader2,
+  LockKeyhole,
+  MoveHorizontal,
   PartyPopper,
   Pencil,
   RefreshCcw,
   Rows3,
   Sparkles,
+  Type,
   Wand2,
   X,
 } from "lucide-react"
@@ -48,32 +54,7 @@ type BaseDesign = {
   photoFrameClass: string
   titleClass: string
   subtitleClass: string
-  categories: DesignCategoryId[]
-  collection: string
-  badge?: DesignBadge
 }
-
-type StripDecoration =
-  | "noir"
-  | "romance"
-  | "vintage"
-  | "barkada"
-  | "white"
-  | "midnight"
-  | "kawaii"
-  | "retro"
-  | "pixel"
-  | "arcade"
-  | "sakura"
-  | "festival"
-  | "moonlight"
-  | "ocean"
-  | "sky"
-  | "christmas"
-  | "halloween"
-  | "graduation"
-  | "summer"
-  | "valentine"
 
 type StripDesign = BaseDesign & {
   kind: "strip"
@@ -85,14 +66,21 @@ type StripDesign = BaseDesign & {
     text: string
     mutedText: string
     accent: string
-    decoration: StripDecoration
+    decoration:
+      | "noir"
+      | "romance"
+      | "vintage"
+      | "barkada"
+      | "white"
+      | "midnight"
+      | "kawaii"
+      | "retro"
   }
 }
 
 type CardDesign = BaseDesign & {
   kind: "card"
   typeLabel: string
-  typeIcon: string
   hp: number
   moveName: string
   moveDamage: number
@@ -136,14 +124,34 @@ type StickerPack = {
   id: StickerPackId
   name: string
   subtitle: string
+  preview: string
   stickers: StickerMap
 }
 
 type CaptionPosition = "top" | "bottom" | "hidden"
 type DateStampMode = "none" | "date" | "date-time" | "date-time-brand"
-type DateStyle = "long" | "numeric"
 type FilmNumberMode = "none" | "frame" | "roll" | "serial"
-type WizardStep = "design" | "stickers" | "filters" | "caption" | "download"
+type WizardStep =
+  | "design"
+  | "stickers"
+  | "filters"
+  | "caption"
+  | "details"
+  | "download"
+
+type EditorState = {
+  activeTab: "strips" | "cards"
+  selectedCategory: DesignCategoryId
+  selectedDesignId: string
+  selectedPhotoIndex: number
+  selectedStickerPackId: StickerPackId
+  stickers: StickerMap
+  selectedFilterId: string
+  caption: string
+  captionPosition: CaptionPosition
+  dateStampMode: DateStampMode
+  filmNumberMode: FilmNumberMode
+}
 
 const STORAGE_KEY = "amoreframe_single_photos"
 const MAX_PHOTOS = 3
@@ -152,8 +160,14 @@ const MAX_CAPTION = 50
 const STRIP_WIDTH = 900
 const PHOTO_WIDTH = 760
 const PHOTO_HEIGHT = 560
-const STRIP_GAP = 30
-const STRIP_HEIGHT = 2200
+const TOP_PADDING = 110
+const GAP = 34
+const BOTTOM_PADDING = 190
+const STRIP_HEIGHT =
+  TOP_PADDING +
+  PHOTO_HEIGHT * MAX_PHOTOS +
+  GAP * (MAX_PHOTOS - 1) +
+  BOTTOM_PADDING
 
 const CARD_WIDTH = 760
 const CARD_HEIGHT = 1120
@@ -165,34 +179,179 @@ const STICKER_SLOTS: StickerSlot[] = [
   "bottomRight",
 ]
 
+const STICKER_OPTIONS = ["❤️", "✨", "🔥", "😂", "🎉", "📸", "🌸", "⭐"]
+
+const WIZARD_STEPS: { id: WizardStep; label: string; shortLabel: string }[] = [
+  { id: "design", label: "Choose a design", shortLabel: "Design" },
+  { id: "stickers", label: "Pick a sticker pack", shortLabel: "Stickers" },
+  { id: "filters", label: "Choose a filter", shortLabel: "Filter" },
+  { id: "caption", label: "Add your words", shortLabel: "Text" },
+  { id: "details", label: "Add film details", shortLabel: "Details" },
+  { id: "download", label: "Review your memory", shortLabel: "Ready" },
+]
+
+const DEFAULT_EDITOR_STATE: EditorState = {
+  activeTab: "strips",
+  selectedCategory: "trending",
+  selectedDesignId: "noir-date",
+  selectedPhotoIndex: 0,
+  selectedStickerPackId: "none",
+  stickers: {},
+  selectedFilterId: "original",
+  caption: "",
+  captionPosition: "bottom",
+  dateStampMode: "none",
+  filmNumberMode: "none",
+}
+
 const DESIGN_CATEGORIES: {
   id: DesignCategoryId
   label: string
   emoji: string
+  designIds: string[]
 }[] = [
-  { id: "trending", label: "Trending", emoji: "🔥" },
-  { id: "romance", label: "Romance", emoji: "❤️" },
-  { id: "aesthetic", label: "Aesthetic", emoji: "✨" },
-  { id: "cute", label: "Cute", emoji: "🎀" },
-  { id: "gaming", label: "Gaming", emoji: "🎮" },
-  { id: "movies", label: "Movies", emoji: "🎬" },
-  { id: "nature", label: "Nature", emoji: "🌸" },
-  { id: "retro", label: "Retro", emoji: "📼" },
-  { id: "seasonal", label: "Seasonal", emoji: "🎄" },
-  { id: "premium", label: "Premium", emoji: "⭐" },
+  {
+    id: "trending",
+    label: "Trending",
+    emoji: "🔥",
+    designIds: [
+      "noir-date",
+      "soft-romance",
+      "barkada-fun",
+      "sakura-dream",
+      "electric-match",
+      "monster-match",
+    ],
+  },
+  {
+    id: "romance",
+    label: "Romance",
+    emoji: "❤️",
+    designIds: [
+      "soft-romance",
+      "noir-date",
+      "kawaii-love",
+      "cherry-blossom",
+      "mythic-bloom",
+      "electric-match",
+    ],
+  },
+  {
+    id: "aesthetic",
+    label: "Aesthetic",
+    emoji: "✨",
+    designIds: [
+      "pure-white",
+      "golden-hour",
+      "ocean-breeze",
+      "sakura-dream",
+      "festival-night",
+      "cosmic-vow",
+    ],
+  },
+  {
+    id: "cute",
+    label: "Cute",
+    emoji: "🎀",
+    designIds: [
+      "kawaii-love",
+      "barkada-fun",
+      "cherry-blossom",
+      "sakura-dream",
+      "mythic-bloom",
+      "monster-match",
+    ],
+  },
+  {
+    id: "gaming",
+    label: "Gaming",
+    emoji: "🎮",
+    designIds: [
+      "pixel-adventure",
+      "retro-pop",
+      "electric-match",
+      "monster-match",
+      "arcade-duo",
+      "cosmic-vow",
+    ],
+  },
+  {
+    id: "movies",
+    label: "Movies",
+    emoji: "🎬",
+    designIds: [
+      "noir-date",
+      "vintage-film",
+      "midnight-luxe",
+      "festival-night",
+      "cosmic-vow",
+    ],
+  },
+  {
+    id: "nature",
+    label: "Nature",
+    emoji: "🌸",
+    designIds: [
+      "golden-hour",
+      "ocean-breeze",
+      "cherry-blossom",
+      "sakura-dream",
+      "mythic-bloom",
+    ],
+  },
+  {
+    id: "retro",
+    label: "Retro",
+    emoji: "📼",
+    designIds: [
+      "vintage-film",
+      "retro-pop",
+      "pixel-adventure",
+      "arcade-duo",
+    ],
+  },
+  {
+    id: "seasonal",
+    label: "Seasonal",
+    emoji: "🎄",
+    designIds: ["christmas-starlight", "cherry-blossom", "golden-hour"],
+  },
+  {
+    id: "premium",
+    label: "Premium",
+    emoji: "⭐",
+    designIds: [
+      "midnight-luxe",
+      "pure-white",
+      "noir-date",
+      "cosmic-vow",
+      "electric-match",
+    ],
+  },
 ]
+
+const DESIGN_BADGES: Partial<Record<string, DesignBadge>> = {
+  "noir-date": "TRENDING",
+  "sakura-dream": "NEW",
+  "pixel-adventure": "NEW",
+  "christmas-starlight": "LIMITED",
+  "electric-match": "TRENDING",
+  "monster-match": "NEW",
+}
 
 const STICKER_PACKS: StickerPack[] = [
   {
     id: "none",
     name: "None",
-    subtitle: "Clean and minimal",
+    subtitle: "Keep the frame clean",
+    preview: "Clean",
     stickers: {},
   },
   {
     id: "hearts",
     name: "Hearts",
-    subtitle: "Soft romantic accents",
+    subtitle: "Soft romantic corners",
+    preview: "❤️ 💕 💗",
     stickers: {
       topLeft: "❤️",
       topRight: "💕",
@@ -203,7 +362,8 @@ const STICKER_PACKS: StickerPack[] = [
   {
     id: "flowers",
     name: "Flowers",
-    subtitle: "Fresh floral corners",
+    subtitle: "Fresh floral details",
+    preview: "🌸 🌷 🌼",
     stickers: {
       topLeft: "🌸",
       topRight: "🌷",
@@ -214,7 +374,8 @@ const STICKER_PACKS: StickerPack[] = [
   {
     id: "sparkles",
     name: "Sparkles",
-    subtitle: "A subtle glow",
+    subtitle: "Light and polished",
+    preview: "✨ ⭐ 💫",
     stickers: {
       topLeft: "✨",
       topRight: "⭐",
@@ -225,7 +386,8 @@ const STICKER_PACKS: StickerPack[] = [
   {
     id: "cute",
     name: "Cute",
-    subtitle: "Sweet diary energy",
+    subtitle: "Sweet diary details",
+    preview: "🎀 🧸 🍓",
     stickers: {
       topLeft: "🎀",
       topRight: "🧸",
@@ -237,6 +399,7 @@ const STICKER_PACKS: StickerPack[] = [
     id: "gaming",
     name: "Gaming",
     subtitle: "Original arcade energy",
+    preview: "🎮 🕹️ 🏆",
     stickers: {
       topLeft: "🎮",
       topRight: "🕹️",
@@ -247,7 +410,8 @@ const STICKER_PACKS: StickerPack[] = [
   {
     id: "retro",
     name: "Retro",
-    subtitle: "Analog and nostalgic",
+    subtitle: "Analog nostalgia",
+    preview: "📼 📻 💿",
     stickers: {
       topLeft: "📼",
       topRight: "📻",
@@ -259,6 +423,7 @@ const STICKER_PACKS: StickerPack[] = [
     id: "space",
     name: "Space",
     subtitle: "Dreamy cosmic details",
+    preview: "🌙 🪐 🚀",
     stickers: {
       topLeft: "🌙",
       topRight: "🪐",
@@ -270,6 +435,7 @@ const STICKER_PACKS: StickerPack[] = [
     id: "food",
     name: "Food",
     subtitle: "Playful snack mood",
+    preview: "🍓 🍰 🧋",
     stickers: {
       topLeft: "🍓",
       topRight: "🍰",
@@ -279,28 +445,12 @@ const STICKER_PACKS: StickerPack[] = [
   },
 ]
 
-const WIZARD_STEPS: { id: WizardStep; label: string }[] = [
-  { id: "design", label: "Design" },
-  { id: "stickers", label: "Stickers" },
-  { id: "filters", label: "Filters" },
-  { id: "caption", label: "Details" },
-  { id: "download", label: "Ready" },
-]
-
-const STEP_TITLES: Record<WizardStep, string> = {
-  design: "Pick your design",
-  stickers: "Choose a sticker pack",
-  filters: "Choose a filter",
-  caption: "Add the finishing details",
-  download: "Your memory is ready",
-}
-{/*Strip Designs*/}
 const STRIP_DESIGNS: StripDesign[] = [
   {
     kind: "strip",
     id: "noir-date",
     name: "Noir Date",
-    subtitle: "Cinematic, bold, and classic.",
+    subtitle: "Cinematic, bold, and undeniably classic.",
     brand: "AmoreFrame",
     accent: "♥",
     palette: ["#070707", "#e85d75", "#242424", "#f5e7e7"],
@@ -311,9 +461,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-rose-300/20 shadow-[0_18px_40px_rgba(0,0,0,0.48)]",
     titleClass: "text-rose-100",
     subtitleClass: "text-rose-300",
-    categories: ["trending", "romance", "movies", "premium"],
-    collection: "Signature Collection",
-    badge: "TRENDING",
     canvas: {
       background: "#070707",
       border: "#7f1d1d",
@@ -339,8 +486,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-white shadow-[0_14px_35px_rgba(190,24,93,0.16)]",
     titleClass: "text-rose-900",
     subtitleClass: "text-rose-700",
-    categories: ["romance", "aesthetic", "trending"],
-    collection: "Romance Collection",
     canvas: {
       background: "#fff1f5",
       border: "#f9a8d4",
@@ -355,7 +500,7 @@ const STRIP_DESIGNS: StripDesign[] = [
     kind: "strip",
     id: "vintage-film",
     name: "Vintage Film",
-    subtitle: "Timeless grain and analog nostalgia.",
+    subtitle: "Timeless grain, real film nostalgia.",
     brand: "AmoreFrame",
     accent: "✦",
     palette: ["#e8d2aa", "#c8a46f", "#5c3212", "#f4e5c7"],
@@ -366,8 +511,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-amber-950/20 shadow-[0_14px_32px_rgba(92,52,18,0.22)]",
     titleClass: "text-amber-950",
     subtitleClass: "text-amber-900",
-    categories: ["retro", "aesthetic", "movies"],
-    collection: "Analog Collection",
     canvas: {
       background: "#dfc39a",
       border: "#92400e",
@@ -393,8 +536,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-white shadow-[0_12px_28px_rgba(234,88,12,0.18)]",
     titleClass: "text-orange-950",
     subtitleClass: "text-orange-700",
-    categories: ["cute", "trending", "aesthetic"],
-    collection: "Playful Collection",
     canvas: {
       background: "#fff7d1",
       border: "#fb923c",
@@ -409,7 +550,7 @@ const STRIP_DESIGNS: StripDesign[] = [
     kind: "strip",
     id: "pure-white",
     name: "Pure White",
-    subtitle: "Clean, minimal, and elegant.",
+    subtitle: "Clean, minimal, and elegantly yours.",
     brand: "AmoreFrame",
     accent: "♥",
     palette: ["#ffffff", "#f2f2f2", "#d4d4d4", "#111111"],
@@ -420,8 +561,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-neutral-200 shadow-[0_14px_32px_rgba(0,0,0,0.12)]",
     titleClass: "text-neutral-900",
     subtitleClass: "text-neutral-500",
-    categories: ["aesthetic", "premium", "romance"],
-    collection: "Signature Collection",
     canvas: {
       background: "#fafaf9",
       border: "#d4d4d4",
@@ -436,7 +575,7 @@ const STRIP_DESIGNS: StripDesign[] = [
     kind: "strip",
     id: "midnight-luxe",
     name: "Midnight Luxe",
-    subtitle: "Dark, luxe, and made for night shots.",
+    subtitle: "Dark, luxe, and perfect for night owls.",
     brand: "AmoreFrame",
     accent: "☾",
     palette: ["#080808", "#1f1117", "#5a2a2a", "#d6a85f"],
@@ -447,8 +586,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-amber-300/20 shadow-[0_18px_40px_rgba(0,0,0,0.48)]",
     titleClass: "text-amber-100",
     subtitleClass: "text-amber-300",
-    categories: ["premium", "movies", "romance"],
-    collection: "Luxe Collection",
     canvas: {
       background: "#09090b",
       border: "#b45309",
@@ -463,7 +600,7 @@ const STRIP_DESIGNS: StripDesign[] = [
     kind: "strip",
     id: "kawaii-love",
     name: "Kawaii Love",
-    subtitle: "Soft, sweet, and sticker-diary inspired.",
+    subtitle: "Cute, soft, and sweet like a sticker diary.",
     brand: "AmoreFrame",
     accent: "♡",
     palette: ["#ffc7e1", "#fff1f8", "#c7d2fe", "#f9a8d4"],
@@ -474,8 +611,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-white shadow-[0_14px_35px_rgba(236,72,153,0.14)]",
     titleClass: "text-pink-900",
     subtitleClass: "text-pink-600",
-    categories: ["cute", "romance", "aesthetic"],
-    collection: "Cute Collection",
     canvas: {
       background: "#fff0f7",
       border: "#f9a8d4",
@@ -490,7 +625,7 @@ const STRIP_DESIGNS: StripDesign[] = [
     kind: "strip",
     id: "retro-pop",
     name: "Retro Pop",
-    subtitle: "Bright, funky, and full of energy.",
+    subtitle: "Bright, funky, and fun for barkada shots.",
     brand: "AmoreFrame",
     accent: "★",
     palette: ["#ff5b45", "#ffd447", "#3ecf8e", "#5bbcff"],
@@ -501,8 +636,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-white shadow-[0_12px_30px_rgba(255,91,69,0.2)]",
     titleClass: "text-zinc-950",
     subtitleClass: "text-zinc-800",
-    categories: ["retro", "cute", "trending"],
-    collection: "Retro Collection",
     canvas: {
       background: "#ffd866",
       border: "#f97316",
@@ -528,8 +661,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       "border-amber-100/30 shadow-[0_16px_36px_rgba(168,50,121,0.28)]",
     titleClass: "text-amber-50",
     subtitleClass: "text-orange-200",
-    categories: ["nature", "aesthetic", "movies"],
-    collection: "Nature Collection",
     canvas: {
       background: "#3a1c47",
       border: "#ff9a56",
@@ -551,12 +682,9 @@ const STRIP_DESIGNS: StripDesign[] = [
     backgroundClass:
       "bg-[linear-gradient(to_bottom,#f0fbff,#dff3fb,#cdeaf7)]",
     outerBorderClass: "border-sky-300/80",
-    photoFrameClass:
-      "border-white shadow-[0_14px_32px_rgba(2,119,189,0.16)]",
+    photoFrameClass: "border-white shadow-[0_14px_32px_rgba(2,119,189,0.16)]",
     titleClass: "text-sky-950",
     subtitleClass: "text-sky-600",
-    categories: ["nature", "aesthetic", "premium"],
-    collection: "Nature Collection",
     canvas: {
       background: "#f0fbff",
       border: "#38bdf8",
@@ -571,19 +699,16 @@ const STRIP_DESIGNS: StripDesign[] = [
     kind: "strip",
     id: "cherry-blossom",
     name: "Cherry Blossom",
-    subtitle: "Soft petals and a springtime feel.",
+    subtitle: "Soft pastel petals, springtime feel.",
     brand: "AmoreFrame",
     accent: "❀",
     palette: ["#ffe3ec", "#ffb6c9", "#c9e4b5", "#fff9f2"],
     backgroundClass:
       "bg-[radial-gradient(circle_at_top,#fff0f4_0%,#ffe3ec_45%,#f4f9ec_100%)]",
     outerBorderClass: "border-rose-200/80",
-    photoFrameClass:
-      "border-white shadow-[0_12px_28px_rgba(255,182,201,0.3)]",
+    photoFrameClass: "border-white shadow-[0_12px_28px_rgba(255,182,201,0.3)]",
     titleClass: "text-rose-800",
     subtitleClass: "text-rose-500",
-    categories: ["nature", "cute", "aesthetic"],
-    collection: "Nature Collection",
     canvas: {
       background: "#fff0f4",
       border: "#ffb6c9",
@@ -594,337 +719,6 @@ const STRIP_DESIGNS: StripDesign[] = [
       decoration: "kawaii",
     },
   },
-  {
-    kind: "strip",
-    id: "pixel-adventure",
-    name: "Pixel Adventure",
-    subtitle: "A bright quest built from tiny memories.",
-    brand: "AmoreFrame",
-    accent: "◆",
-    palette: ["#120b2d", "#7c3aed", "#22d3ee", "#facc15"],
-    backgroundClass:
-      "bg-[linear-gradient(145deg,#120b2d_0%,#27125e_48%,#0f766e_100%)]",
-    outerBorderClass: "border-cyan-300/55",
-    photoFrameClass:
-      "border-cyan-200/35 shadow-[0_0_26px_rgba(34,211,238,0.22)]",
-    titleClass: "text-cyan-50",
-    subtitleClass: "text-cyan-200",
-    categories: ["gaming", "retro", "trending"],
-    collection: "Gaming Collection",
-    badge: "NEW",
-    canvas: {
-      background: "#120b2d",
-      border: "#22d3ee",
-      photoBorder: "#7c3aed",
-      text: "#ecfeff",
-      mutedText: "#a5f3fc",
-      accent: "#facc15",
-      decoration: "pixel",
-    },
-  },
-  {
-    kind: "strip",
-    id: "retro-arcade",
-    name: "Retro Arcade",
-    subtitle: "Neon scores and after-school energy.",
-    brand: "AmoreFrame",
-    accent: "▲",
-    palette: ["#09090b", "#ec4899", "#22d3ee", "#a3e635"],
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#3b0764_0%,#09090b_56%,#052e16_100%)]",
-    outerBorderClass: "border-fuchsia-400/55",
-    photoFrameClass:
-      "border-lime-300/30 shadow-[0_0_30px_rgba(236,72,153,0.24)]",
-    titleClass: "text-fuchsia-100",
-    subtitleClass: "text-cyan-200",
-    categories: ["gaming", "retro", "movies"],
-    collection: "Gaming Collection",
-    canvas: {
-      background: "#09090b",
-      border: "#ec4899",
-      photoBorder: "#22d3ee",
-      text: "#fdf4ff",
-      mutedText: "#a5f3fc",
-      accent: "#a3e635",
-      decoration: "arcade",
-    },
-  },
-  {
-    kind: "strip",
-    id: "sakura-dream",
-    name: "Sakura Dream",
-    subtitle: "An original pastel story under falling petals.",
-    brand: "AmoreFrame",
-    accent: "✿",
-    palette: ["#fff1f7", "#f9a8d4", "#c4b5fd", "#86efac"],
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#fff1f7_0%,#fce7f3_42%,#ede9fe_100%)]",
-    outerBorderClass: "border-pink-300/65",
-    photoFrameClass:
-      "border-white shadow-[0_14px_34px_rgba(244,114,182,0.2)]",
-    titleClass: "text-fuchsia-950",
-    subtitleClass: "text-fuchsia-600",
-    categories: ["aesthetic", "cute", "nature", "trending"],
-    collection: "Anime Collection",
-    badge: "TRENDING",
-    canvas: {
-      background: "#fff1f7",
-      border: "#f9a8d4",
-      photoBorder: "#ffffff",
-      text: "#701a75",
-      mutedText: "#c026d3",
-      accent: "#f472b6",
-      decoration: "sakura",
-    },
-  },
-  {
-    kind: "strip",
-    id: "festival-night",
-    name: "Festival Night",
-    subtitle: "Lantern light and warm evening color.",
-    brand: "AmoreFrame",
-    accent: "✦",
-    palette: ["#190b2d", "#7c2d12", "#f59e0b", "#fb7185"],
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#4c1d95_0%,#1f102f_48%,#12070d_100%)]",
-    outerBorderClass: "border-orange-300/45",
-    photoFrameClass:
-      "border-amber-200/25 shadow-[0_16px_38px_rgba(245,158,11,0.18)]",
-    titleClass: "text-amber-50",
-    subtitleClass: "text-orange-200",
-    categories: ["movies", "aesthetic", "romance"],
-    collection: "Anime Collection",
-    canvas: {
-      background: "#1f102f",
-      border: "#f59e0b",
-      photoBorder: "#fb7185",
-      text: "#fffbeb",
-      mutedText: "#fed7aa",
-      accent: "#f59e0b",
-      decoration: "festival",
-    },
-  },
-  {
-    kind: "strip",
-    id: "moonlight-letter",
-    name: "Moonlight",
-    subtitle: "Quiet blue light and soft star details.",
-    brand: "AmoreFrame",
-    accent: "☾",
-    palette: ["#0f172a", "#312e81", "#818cf8", "#e0e7ff"],
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#312e81_0%,#111827_52%,#020617_100%)]",
-    outerBorderClass: "border-indigo-300/45",
-    photoFrameClass:
-      "border-indigo-100/20 shadow-[0_16px_40px_rgba(49,46,129,0.35)]",
-    titleClass: "text-indigo-50",
-    subtitleClass: "text-indigo-200",
-    categories: ["aesthetic", "premium", "movies"],
-    collection: "Anime Collection",
-    canvas: {
-      background: "#0f172a",
-      border: "#818cf8",
-      photoBorder: "#c7d2fe",
-      text: "#eef2ff",
-      mutedText: "#c7d2fe",
-      accent: "#a5b4fc",
-      decoration: "moonlight",
-    },
-  },
-  {
-    kind: "strip",
-    id: "ocean-spirit",
-    name: "Ocean Spirit",
-    subtitle: "Flowing blues with a calm illustrated mood.",
-    brand: "AmoreFrame",
-    accent: "≈",
-    palette: ["#ecfeff", "#67e8f9", "#0284c7", "#164e63"],
-    backgroundClass:
-      "bg-[linear-gradient(to_bottom,#ecfeff_0%,#bae6fd_38%,#0e7490_100%)]",
-    outerBorderClass: "border-cyan-200/70",
-    photoFrameClass:
-      "border-white/85 shadow-[0_16px_36px_rgba(14,116,144,0.22)]",
-    titleClass: "text-cyan-950",
-    subtitleClass: "text-cyan-800",
-    categories: ["nature", "aesthetic", "premium"],
-    collection: "Anime Collection",
-    canvas: {
-      background: "#cffafe",
-      border: "#0891b2",
-      photoBorder: "#ffffff",
-      text: "#164e63",
-      mutedText: "#0e7490",
-      accent: "#0284c7",
-      decoration: "ocean",
-    },
-  },
-  {
-    kind: "strip",
-    id: "magical-sky",
-    name: "Magical Sky",
-    subtitle: "Pastel clouds and a dreamy twilight glow.",
-    brand: "AmoreFrame",
-    accent: "✧",
-    palette: ["#f5d0fe", "#c4b5fd", "#93c5fd", "#fef3c7"],
-    backgroundClass:
-      "bg-[linear-gradient(to_bottom,#f5d0fe_0%,#c4b5fd_48%,#93c5fd_100%)]",
-    outerBorderClass: "border-purple-200/70",
-    photoFrameClass:
-      "border-white/80 shadow-[0_14px_32px_rgba(124,58,237,0.18)]",
-    titleClass: "text-indigo-950",
-    subtitleClass: "text-indigo-700",
-    categories: ["cute", "aesthetic", "nature"],
-    collection: "Anime Collection",
-    canvas: {
-      background: "#ddd6fe",
-      border: "#8b5cf6",
-      photoBorder: "#ffffff",
-      text: "#312e81",
-      mutedText: "#5b21b6",
-      accent: "#f59e0b",
-      decoration: "sky",
-    },
-  },
-  {
-    kind: "strip",
-    id: "valentine-limited",
-    name: "Valentine Note",
-    subtitle: "A limited love-letter edition.",
-    brand: "AmoreFrame",
-    accent: "♥",
-    palette: ["#fff1f2", "#fda4af", "#e11d48", "#7f1d1d"],
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#fff1f2_0%,#fecdd3_50%,#fb7185_100%)]",
-    outerBorderClass: "border-rose-300/75",
-    photoFrameClass:
-      "border-white shadow-[0_14px_32px_rgba(225,29,72,0.22)]",
-    titleClass: "text-rose-950",
-    subtitleClass: "text-rose-700",
-    categories: ["seasonal", "romance", "cute"],
-    collection: "Seasonal Collection",
-    badge: "LIMITED",
-    canvas: {
-      background: "#ffe4e6",
-      border: "#e11d48",
-      photoBorder: "#ffffff",
-      text: "#881337",
-      mutedText: "#be123c",
-      accent: "#e11d48",
-      decoration: "valentine",
-    },
-  },
-  {
-    kind: "strip",
-    id: "graduation-glow",
-    name: "Graduation Glow",
-    subtitle: "A polished frame for the big milestone.",
-    brand: "AmoreFrame",
-    accent: "★",
-    palette: ["#111827", "#1d4ed8", "#fbbf24", "#f9fafb"],
-    backgroundClass:
-      "bg-[linear-gradient(145deg,#111827_0%,#172554_58%,#1d4ed8_100%)]",
-    outerBorderClass: "border-amber-300/55",
-    photoFrameClass:
-      "border-amber-200/30 shadow-[0_16px_36px_rgba(251,191,36,0.2)]",
-    titleClass: "text-amber-50",
-    subtitleClass: "text-amber-200",
-    categories: ["seasonal", "premium", "trending"],
-    collection: "Seasonal Collection",
-    badge: "NEW",
-    canvas: {
-      background: "#111827",
-      border: "#fbbf24",
-      photoBorder: "#1d4ed8",
-      text: "#fffbeb",
-      mutedText: "#fde68a",
-      accent: "#fbbf24",
-      decoration: "graduation",
-    },
-  },
-  {
-    kind: "strip",
-    id: "summer-postcard",
-    name: "Summer Postcard",
-    subtitle: "Sun, sea, and bright vacation color.",
-    brand: "AmoreFrame",
-    accent: "☀",
-    palette: ["#fef3c7", "#fb923c", "#38bdf8", "#14b8a6"],
-    backgroundClass:
-      "bg-[linear-gradient(to_bottom,#fef3c7_0%,#fdba74_42%,#7dd3fc_100%)]",
-    outerBorderClass: "border-orange-200/75",
-    photoFrameClass:
-      "border-white shadow-[0_14px_34px_rgba(14,165,233,0.18)]",
-    titleClass: "text-sky-950",
-    subtitleClass: "text-orange-800",
-    categories: ["seasonal", "nature", "retro"],
-    collection: "Seasonal Collection",
-    badge: "LIMITED",
-    canvas: {
-      background: "#fed7aa",
-      border: "#f97316",
-      photoBorder: "#ffffff",
-      text: "#0c4a6e",
-      mutedText: "#c2410c",
-      accent: "#0284c7",
-      decoration: "summer",
-    },
-  },
-  {
-    kind: "strip",
-    id: "halloween-afterglow",
-    name: "Halloween Afterglow",
-    subtitle: "Moody orange light with playful spooky details.",
-    brand: "AmoreFrame",
-    accent: "☾",
-    palette: ["#09090b", "#581c87", "#f97316", "#facc15"],
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#581c87_0%,#18181b_52%,#09090b_100%)]",
-    outerBorderClass: "border-orange-400/55",
-    photoFrameClass:
-      "border-purple-300/25 shadow-[0_16px_38px_rgba(249,115,22,0.2)]",
-    titleClass: "text-orange-50",
-    subtitleClass: "text-orange-200",
-    categories: ["seasonal", "movies", "cute"],
-    collection: "Seasonal Collection",
-    badge: "LIMITED",
-    canvas: {
-      background: "#18181b",
-      border: "#f97316",
-      photoBorder: "#7e22ce",
-      text: "#fff7ed",
-      mutedText: "#fdba74",
-      accent: "#facc15",
-      decoration: "halloween",
-    },
-  },
-  {
-    kind: "strip",
-    id: "christmas-starlight",
-    name: "Christmas Starlight",
-    subtitle: "Deep green, warm gold, and soft snow.",
-    brand: "AmoreFrame",
-    accent: "★",
-    palette: ["#052e16", "#166534", "#fbbf24", "#fefce8"],
-    backgroundClass:
-      "bg-[radial-gradient(circle_at_top,#166534_0%,#052e16_58%,#02150a_100%)]",
-    outerBorderClass: "border-amber-300/55",
-    photoFrameClass:
-      "border-amber-100/25 shadow-[0_16px_38px_rgba(251,191,36,0.18)]",
-    titleClass: "text-amber-50",
-    subtitleClass: "text-amber-200",
-    categories: ["seasonal", "premium", "romance"],
-    collection: "Seasonal Collection",
-    badge: "LIMITED",
-    canvas: {
-      background: "#052e16",
-      border: "#fbbf24",
-      photoBorder: "#166534",
-      text: "#fefce8",
-      mutedText: "#fde68a",
-      accent: "#fbbf24",
-      decoration: "christmas",
-    },
-  },
 ]
 
 const CARD_DESIGNS: CardDesign[] = [
@@ -932,26 +726,21 @@ const CARD_DESIGNS: CardDesign[] = [
     kind: "card",
     id: "electric-match",
     name: "Electric Match",
-    subtitle: "Sparks fly in this original holo edition.",
+    subtitle: "Sparks fly \u2014 holo edition.",
     brand: "AmoreFrame",
     palette: ["#fef08a", "#facc15", "#1d4ed8", "#111827"],
     backgroundClass:
       "bg-[linear-gradient(150deg,#fef9c3_0%,#fde68a_45%,#bfdbfe_100%)]",
     outerBorderClass: "border-yellow-400/70",
-    photoFrameClass:
-      "border-blue-700/40 shadow-[0_14px_32px_rgba(29,78,216,0.2)]",
+    photoFrameClass: "border-blue-700/40 shadow-[0_14px_32px_rgba(29,78,216,0.2)]",
     titleClass: "text-blue-950",
     subtitleClass: "text-amber-800",
-    categories: ["gaming", "trending", "romance"],
-    collection: "Gaming Collection",
-    badge: "TRENDING",
-    typeLabel: "Spark",
-    typeIcon: "⚡",
+    typeLabel: "Electric",
     hp: 180,
     moveName: "Perfect Spark",
     moveDamage: 120,
     moveDescription: "Two hearts charge together and never lose power.",
-    rarity: "✦",
+    rarity: "⚡",
     holoGradient: ["#facc15", "#fca5a5", "#93c5fd", "#c4b5fd", "#facc15"],
     canvas: {
       background: "#fde68a",
@@ -966,20 +755,16 @@ const CARD_DESIGNS: CardDesign[] = [
     kind: "card",
     id: "mythic-bloom",
     name: "Mythic Bloom",
-    subtitle: "Rose-gold foil with a fairytale mood.",
+    subtitle: "Rose-gold foil, straight from a fairytale.",
     brand: "AmoreFrame",
     palette: ["#fbcfe8", "#f9a8d4", "#fde68a", "#831843"],
     backgroundClass:
       "bg-[linear-gradient(150deg,#fff1f8_0%,#fbcfe8_45%,#fde68a_100%)]",
     outerBorderClass: "border-pink-300/70",
-    photoFrameClass:
-      "border-pink-600/30 shadow-[0_14px_32px_rgba(219,39,119,0.2)]",
+    photoFrameClass: "border-pink-600/30 shadow-[0_14px_32px_rgba(219,39,119,0.2)]",
     titleClass: "text-pink-950",
     subtitleClass: "text-pink-700",
-    categories: ["romance", "aesthetic", "cute"],
-    collection: "Romance Collection",
-    typeLabel: "Bloom",
-    typeIcon: "✿",
+    typeLabel: "Fairy",
     hp: 150,
     moveName: "Adventure Together",
     moveDamage: 100,
@@ -1005,18 +790,14 @@ const CARD_DESIGNS: CardDesign[] = [
     backgroundClass:
       "bg-[radial-gradient(circle_at_top,#312e81_0%,#1e1b4b_45%,#0b0620_100%)]",
     outerBorderClass: "border-indigo-400/50",
-    photoFrameClass:
-      "border-indigo-200/25 shadow-[0_16px_36px_rgba(0,0,0,0.4)]",
+    photoFrameClass: "border-indigo-200/25 shadow-[0_16px_36px_rgba(0,0,0,0.4)]",
     titleClass: "text-indigo-100",
     subtitleClass: "text-purple-300",
-    categories: ["gaming", "aesthetic", "premium"],
-    collection: "Gaming Collection",
-    typeLabel: "Cosmic",
-    typeIcon: "☾",
+    typeLabel: "Psychic",
     hp: 200,
     moveName: "Starbound Promise",
     moveDamage: 140,
-    moveDescription: "Written across galaxies and made real right here.",
+    moveDescription: "Written across galaxies, made real right here.",
     rarity: "☾",
     holoGradient: ["#7dd3fc", "#c4b5fd", "#f5d0fe", "#7dd3fc"],
     canvas: {
@@ -1028,10 +809,118 @@ const CARD_DESIGNS: CardDesign[] = [
       accent: "#a5b4fc",
     },
   },
+]
+
+
+
+const EXTRA_STRIP_DESIGNS: StripDesign[] = [
+  {
+    kind: "strip",
+    id: "pixel-adventure",
+    name: "Pixel Adventure",
+    subtitle: "A bright original quest made from tiny memories.",
+    brand: "AmoreFrame",
+    accent: "◆",
+    palette: ["#120b2d", "#7c3aed", "#22d3ee", "#facc15"],
+    backgroundClass:
+      "bg-[linear-gradient(145deg,#120b2d_0%,#27125e_48%,#0f766e_100%)]",
+    outerBorderClass: "border-cyan-300/55",
+    photoFrameClass:
+      "border-cyan-200/35 shadow-[0_0_26px_rgba(34,211,238,0.22)]",
+    titleClass: "text-cyan-50",
+    subtitleClass: "text-cyan-200",
+    canvas: {
+      background: "#120b2d",
+      border: "#22d3ee",
+      photoBorder: "#7c3aed",
+      text: "#ecfeff",
+      mutedText: "#a5f3fc",
+      accent: "#facc15",
+      decoration: "retro",
+    },
+  },
+  {
+    kind: "strip",
+    id: "sakura-dream",
+    name: "Sakura Dream",
+    subtitle: "An original pastel story under falling petals.",
+    brand: "AmoreFrame",
+    accent: "✿",
+    palette: ["#fff1f7", "#f9a8d4", "#c4b5fd", "#86efac"],
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#fff1f7_0%,#fce7f3_42%,#ede9fe_100%)]",
+    outerBorderClass: "border-pink-300/65",
+    photoFrameClass:
+      "border-white shadow-[0_14px_34px_rgba(244,114,182,0.2)]",
+    titleClass: "text-fuchsia-950",
+    subtitleClass: "text-fuchsia-600",
+    canvas: {
+      background: "#fff1f7",
+      border: "#f9a8d4",
+      photoBorder: "#ffffff",
+      text: "#701a75",
+      mutedText: "#c026d3",
+      accent: "#f472b6",
+      decoration: "kawaii",
+    },
+  },
+  {
+    kind: "strip",
+    id: "festival-night",
+    name: "Festival Night",
+    subtitle: "Lantern light and warm evening color.",
+    brand: "AmoreFrame",
+    accent: "✦",
+    palette: ["#190b2d", "#7c2d12", "#f59e0b", "#fb7185"],
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#4c1d95_0%,#1f102f_48%,#12070d_100%)]",
+    outerBorderClass: "border-orange-300/45",
+    photoFrameClass:
+      "border-amber-200/25 shadow-[0_16px_38px_rgba(245,158,11,0.18)]",
+    titleClass: "text-amber-50",
+    subtitleClass: "text-orange-200",
+    canvas: {
+      background: "#1f102f",
+      border: "#f59e0b",
+      photoBorder: "#fb7185",
+      text: "#fffbeb",
+      mutedText: "#fed7aa",
+      accent: "#f59e0b",
+      decoration: "midnight",
+    },
+  },
+  {
+    kind: "strip",
+    id: "christmas-starlight",
+    name: "Christmas Starlight",
+    subtitle: "Deep green, warm gold, and soft winter light.",
+    brand: "AmoreFrame",
+    accent: "★",
+    palette: ["#052e16", "#166534", "#fbbf24", "#fefce8"],
+    backgroundClass:
+      "bg-[radial-gradient(circle_at_top,#166534_0%,#052e16_58%,#02150a_100%)]",
+    outerBorderClass: "border-amber-300/55",
+    photoFrameClass:
+      "border-amber-100/25 shadow-[0_16px_38px_rgba(251,191,36,0.18)]",
+    titleClass: "text-amber-50",
+    subtitleClass: "text-amber-200",
+    canvas: {
+      background: "#052e16",
+      border: "#fbbf24",
+      photoBorder: "#166534",
+      text: "#fefce8",
+      mutedText: "#fde68a",
+      accent: "#fbbf24",
+      decoration: "midnight",
+    },
+  },
+]
+
+const EXTRA_CARD_DESIGNS: CardDesign[] = [
   {
     kind: "card",
-    id: "monster-battle",
-    name: "Monster Battle",
+    id: "monster-match",
+    name: "Monster Match",
     subtitle: "An original creature-battle inspired keepsake.",
     brand: "AmoreFrame",
     palette: ["#dcfce7", "#4ade80", "#14532d", "#fef08a"],
@@ -1042,11 +931,7 @@ const CARD_DESIGNS: CardDesign[] = [
       "border-emerald-800/35 shadow-[0_14px_32px_rgba(20,83,45,0.2)]",
     titleClass: "text-emerald-950",
     subtitleClass: "text-emerald-800",
-    categories: ["gaming", "cute", "trending"],
-    collection: "Gaming Collection",
-    badge: "NEW",
     typeLabel: "Wild Bond",
-    typeIcon: "🌿",
     hp: 170,
     moveName: "Team-Up Rush",
     moveDamage: 110,
@@ -1064,42 +949,8 @@ const CARD_DESIGNS: CardDesign[] = [
   },
   {
     kind: "card",
-    id: "trading-card-inspired",
-    name: "Trading Card Inspired",
-    subtitle: "A premium original trading-card photobooth frame.",
-    brand: "AmoreFrame",
-    palette: ["#fee2e2", "#fb7185", "#f59e0b", "#7c3aed"],
-    backgroundClass:
-      "bg-[linear-gradient(145deg,#fff7ed_0%,#fecdd3_42%,#ddd6fe_100%)]",
-    outerBorderClass: "border-amber-300/75",
-    photoFrameClass:
-      "border-rose-700/35 shadow-[0_14px_36px_rgba(190,24,93,0.22)]",
-    titleClass: "text-rose-950",
-    subtitleClass: "text-rose-700",
-    categories: ["gaming", "trending", "premium", "romance"],
-    collection: "Gaming Collection",
-    badge: "TRENDING",
-    typeLabel: "Bond",
-    typeIcon: "♥",
-    hp: 180,
-    moveName: "Perfect Match",
-    moveDamage: 120,
-    moveDescription: "Both players gain joy whenever this memory is viewed.",
-    rarity: "★",
-    holoGradient: ["#f59e0b", "#fb7185", "#67e8f9", "#a78bfa", "#f59e0b"],
-    canvas: {
-      background: "#ffe4e6",
-      border: "#d97706",
-      photoBorder: "#be123c",
-      text: "#4c0519",
-      mutedText: "#9f1239",
-      accent: "#7c3aed",
-    },
-  },
-  {
-    kind: "card",
-    id: "retro-hero",
-    name: "Retro Hero",
+    id: "arcade-duo",
+    name: "Arcade Duo",
     subtitle: "Pixel-era champion energy with foil accents.",
     brand: "AmoreFrame",
     palette: ["#111827", "#06b6d4", "#d946ef", "#a3e635"],
@@ -1110,16 +961,12 @@ const CARD_DESIGNS: CardDesign[] = [
       "border-lime-300/30 shadow-[0_0_34px_rgba(34,211,238,0.22)]",
     titleClass: "text-cyan-50",
     subtitleClass: "text-cyan-200",
-    categories: ["gaming", "retro", "movies"],
-    collection: "Gaming Collection",
-    badge: "NEW",
     typeLabel: "Arcade",
-    typeIcon: "▲",
     hp: 190,
     moveName: "High Score Bond",
     moveDamage: 130,
-    moveDescription: "Combo memories multiply when both players smile.",
-    rarity: "◆",
+    moveDescription: "Combo memories multiply whenever both players smile.",
+    rarity: "▲",
     holoGradient: ["#06b6d4", "#d946ef", "#a3e635", "#facc15", "#06b6d4"],
     canvas: {
       background: "#111827",
@@ -1132,7 +979,12 @@ const CARD_DESIGNS: CardDesign[] = [
   },
 ]
 
-const ALL_DESIGNS: DesignOption[] = [...STRIP_DESIGNS, ...CARD_DESIGNS]
+const ALL_STRIP_DESIGNS = [...STRIP_DESIGNS, ...EXTRA_STRIP_DESIGNS]
+const ALL_CARD_DESIGNS = [...CARD_DESIGNS, ...EXTRA_CARD_DESIGNS]
+const ALL_DESIGNS: DesignOption[] = [
+  ...ALL_STRIP_DESIGNS,
+  ...ALL_CARD_DESIGNS,
+]
 
 const FILTERS: FilterOption[] = [
   {
@@ -1174,61 +1026,37 @@ const FILTERS: FilterOption[] = [
   },
 ]
 
+
+
+const imagePromiseCache = new Map<string, Promise<HTMLImageElement>>()
+
 export default function ResultClient() {
   const [photos, setPhotos] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<"strips" | "cards">("strips")
-  const [selectedCategory, setSelectedCategory] =
-    useState<DesignCategoryId>("trending")
-  const [selectedDesignId, setSelectedDesignId] = useState("noir-date")
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
-  const [stickers, setStickers] = useState<StickerMap>({})
-  const [selectedStickerPackId, setSelectedStickerPackId] =
-    useState<StickerPackId>("none")
-  const [selectedFilterId, setSelectedFilterId] = useState("original")
-  const [caption, setCaption] = useState("")
-  const [captionPosition, setCaptionPosition] =
-    useState<CaptionPosition>("bottom")
-  const [dateStampMode, setDateStampMode] =
-    useState<DateStampMode>("none")
-  const [dateStyle, setDateStyle] = useState<DateStyle>("long")
-  const [filmNumberMode, setFilmNumberMode] =
-    useState<FilmNumberMode>("none")
+  const [editor, setEditor] = useState<EditorState>(DEFAULT_EDITOR_STATE)
   const [loading, setLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
-  const [wizardStepIndex, setWizardStepIndex] = useState(0)
+  const [wizardStartStep, setWizardStartStep] = useState(0)
+  const [previewRevision, setPreviewRevision] = useState(0)
 
-  const hasAutoOpened = useRef(false)
   const captureDate = useRef(new Date()).current
 
   const selectedDesign = useMemo(
-    () =>
-      ALL_DESIGNS.find((design) => design.id === selectedDesignId) ??
-      ALL_DESIGNS[0],
-    [selectedDesignId]
+    () => getDesignById(editor.selectedDesignId),
+    [editor.selectedDesignId]
   )
-
   const selectedFilter = useMemo(
-    () =>
-      FILTERS.find((filter) => filter.id === selectedFilterId) ?? FILTERS[0],
-    [selectedFilterId]
+    () => getFilterById(editor.selectedFilterId),
+    [editor.selectedFilterId]
   )
-
-  const selectedStickerPack = useMemo(
-    () =>
-      STICKER_PACKS.find((pack) => pack.id === selectedStickerPackId) ??
-      STICKER_PACKS[0],
-    [selectedStickerPackId]
-  )
-
+  const previewPhotos = useMemo(() => photos.slice(0, MAX_PHOTOS), [photos])
   const dateStampText = useMemo(
-    () => formatDateStamp(captureDate, dateStampMode, dateStyle),
-    [captureDate, dateStampMode, dateStyle]
+    () => formatDateStamp(captureDate, editor.dateStampMode),
+    [captureDate, editor.dateStampMode]
   )
-
   const filmNumberText = useMemo(
-    () => formatFilmNumber(captureDate, filmNumberMode),
-    [captureDate, filmNumberMode]
+    () => formatFilmNumber(captureDate, editor.filmNumberMode),
+    [captureDate, editor.filmNumberMode]
   )
 
   useEffect(() => {
@@ -1241,15 +1069,12 @@ export default function ResultClient() {
 
     try {
       const parsed: unknown = JSON.parse(raw)
-
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        window.location.href = "/booth/single"
-        return
-      }
-
-      const validPhotos = parsed.filter(
-        (value): value is string => typeof value === "string" && value.length > 0
-      )
+      const validPhotos = Array.isArray(parsed)
+        ? parsed.filter(
+            (value): value is string =>
+              typeof value === "string" && value.length > 0
+          )
+        : []
 
       if (validPhotos.length === 0) {
         window.location.href = "/booth/single"
@@ -1266,147 +1091,115 @@ export default function ResultClient() {
   }, [])
 
   useEffect(() => {
-    if (!loading && photos.length > 0 && !hasAutoOpened.current) {
-      hasAutoOpened.current = true
-      setWizardOpen(true)
-      setWizardStepIndex(0)
-    }
-  }, [loading, photos])
+    if (photos.length === 0) return
 
-  const previewPhotos = useMemo(() => photos.slice(0, MAX_PHOTOS), [photos])
+    const timer = window.setTimeout(() => {
+      photos.forEach((photo) => {
+        void loadImage(photo).catch(() => undefined)
+      })
+    }, 80)
 
-  const previewKey = useMemo(
-    () =>
-      [
-        selectedDesignId,
-        selectedFilterId,
-        selectedStickerPackId,
-        caption,
-        captionPosition,
-        dateStampMode,
-        dateStyle,
-        filmNumberMode,
-        selectedPhotoIndex,
-        Object.values(stickers).join(""),
-      ].join("|"),
-    [
-      caption,
-      captionPosition,
-      dateStampMode,
-      dateStyle,
-      filmNumberMode,
-      selectedDesignId,
-      selectedFilterId,
-      selectedPhotoIndex,
-      selectedStickerPackId,
-      stickers,
-    ]
-  )
+    return () => window.clearTimeout(timer)
+  }, [photos])
 
-  const filledStickerCount = useMemo(
-    () => STICKER_SLOTS.filter((slot) => stickers[slot]).length,
-    [stickers]
-  )
+  const openWizardAt = useCallback((stepId: WizardStep) => {
+    const index = WIZARD_STEPS.findIndex((step) => step.id === stepId)
+    setWizardStartStep(index === -1 ? 0 : index)
+    setWizardOpen(true)
+  }, [])
+
+  const closeWizard = useCallback(() => setWizardOpen(false), [])
+
+  const applyEditorChanges = useCallback((nextEditor: EditorState) => {
+    setEditor(nextEditor)
+    setPreviewRevision((current) => current + 1)
+    setWizardOpen(false)
+  }, [])
 
   const retakePhotos = useCallback(() => {
     sessionStorage.removeItem(STORAGE_KEY)
     window.location.href = "/booth/single"
   }, [])
 
-  const closeWizard = useCallback(() => setWizardOpen(false), [])
+  const handleDownload = useCallback(
+    async (state: EditorState = editor) => {
+      if (previewPhotos.length === 0 || isDownloading) return
 
-  const openWizardAt = useCallback((stepId: WizardStep) => {
-    const index = WIZARD_STEPS.findIndex((step) => step.id === stepId)
-    setWizardStepIndex(index === -1 ? 0 : index)
-    setWizardOpen(true)
-  }, [])
+      try {
+        setIsDownloading(true)
 
-  const applyStickerPack = useCallback((packId: StickerPackId) => {
-    const pack = STICKER_PACKS.find((option) => option.id === packId)
-    if (!pack) return
+        const design = getDesignById(state.selectedDesignId)
+        const filter = getFilterById(state.selectedFilterId)
+        const canvas = document.createElement("canvas")
+        const stateDateStampText = formatDateStamp(
+          captureDate,
+          state.dateStampMode
+        )
+        const stateFilmNumberText = formatFilmNumber(
+          captureDate,
+          state.filmNumberMode
+        )
 
-    setSelectedStickerPackId(packId)
-    setStickers({ ...pack.stickers })
-  }, [])
+        if (design.kind === "strip") {
+          canvas.width = STRIP_WIDTH
+          canvas.height = STRIP_HEIGHT
 
-  const removeSticker = useCallback((slot: StickerSlot) => {
-    setStickers((current) => {
-      const updated = { ...current }
-      delete updated[slot]
-      return updated
-    })
-  }, [])
+          const ctx = canvas.getContext("2d")
+          if (!ctx) throw new Error("Canvas context is unavailable")
 
-  const handleDownload = useCallback(async () => {
-    if (previewPhotos.length === 0 || isDownloading) return
+          await drawStrip({
+            ctx,
+            photos: previewPhotos,
+            design,
+            filter,
+            caption: state.caption,
+            captionPosition: state.captionPosition,
+            dateStampText: stateDateStampText,
+            filmNumberText: stateFilmNumberText,
+            stickers: state.stickers,
+          })
+        } else {
+          canvas.width = CARD_WIDTH
+          canvas.height = CARD_HEIGHT
 
-    try {
-      setIsDownloading(true)
+          const ctx = canvas.getContext("2d")
+          if (!ctx) throw new Error("Canvas context is unavailable")
 
-      const canvas = document.createElement("canvas")
+          const photo =
+            previewPhotos[state.selectedPhotoIndex] ?? previewPhotos[0]
 
-      if (selectedDesign.kind === "strip") {
-        canvas.width = STRIP_WIDTH
-        canvas.height = STRIP_HEIGHT
+          await drawCard({
+            ctx,
+            photo,
+            design,
+            filter,
+            caption: state.caption,
+            captionPosition: state.captionPosition,
+            dateStampText: stateDateStampText,
+            filmNumberText: stateFilmNumberText,
+            stickers: state.stickers,
+          })
+        }
 
-        const ctx = canvas.getContext("2d")
-        if (!ctx) throw new Error("Canvas is unavailable")
+        const blob = await canvasToBlob(canvas)
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
 
-        await drawStrip({
-          ctx,
-          photos: previewPhotos,
-          design: selectedDesign,
-          filter: selectedFilter,
-          caption,
-          captionPosition,
-          dateStampText,
-          filmNumberText,
-          stickers,
-        })
-      } else {
-        canvas.width = CARD_WIDTH
-        canvas.height = CARD_HEIGHT
-
-        const ctx = canvas.getContext("2d")
-        if (!ctx) throw new Error("Canvas is unavailable")
-
-        const photo = previewPhotos[selectedPhotoIndex] ?? previewPhotos[0]
-
-        await drawCard({
-          ctx,
-          photo,
-          design: selectedDesign,
-          filter: selectedFilter,
-          caption,
-          captionPosition,
-          dateStampText,
-          filmNumberText,
-          stickers,
-        })
+        link.href = url
+        link.download = `amoreframe-${design.id}-${filter.id}-${Date.now()}.png`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      } catch (error) {
+        console.error("Download error:", error)
+        window.alert("We could not download your memory. Please try again.")
+      } finally {
+        setIsDownloading(false)
       }
-
-      const link = document.createElement("a")
-      link.href = canvas.toDataURL("image/png")
-      link.download = `amoreframe-${selectedDesign.id}-${selectedFilter.id}-${Date.now()}.png`
-      link.click()
-    } catch (error) {
-      console.error("Download error:", error)
-      window.alert("We could not download your memory. Please try again.")
-    } finally {
-      setIsDownloading(false)
-    }
-  }, [
-    caption,
-    captionPosition,
-    dateStampText,
-    filmNumberText,
-    isDownloading,
-    previewPhotos,
-    selectedDesign,
-    selectedFilter,
-    selectedPhotoIndex,
-    stickers,
-  ])
+    },
+    [captureDate, editor, isDownloading, previewPhotos]
+  )
 
   if (loading) {
     return (
@@ -1421,41 +1214,20 @@ export default function ResultClient() {
     )
   }
 
-  const captionLabel = selectedDesign.kind === "card" ? "Card name" : "Caption"
-  const stickerSummary =
-    filledStickerCount === 0
-      ? "None"
-      : `${selectedStickerPack.name} · ${filledStickerCount} placed`
-  const detailSummary = [
-    captionPosition === "hidden" ? "Caption hidden" : `${capitalize(captionPosition)} caption`,
-    dateStampText || "No date",
-    filmNumberText || "No film number",
-  ].join(" · ")
+  const filledStickerCount = STICKER_SLOTS.filter(
+    (slot) => editor.stickers[slot]
+  ).length
+  const stickerPack =
+    STICKER_PACKS.find((pack) => pack.id === editor.selectedStickerPackId) ??
+    STICKER_PACKS[0]
 
   return (
     <>
       <style jsx global>{`
-        @keyframes previewSwap {
-          0% {
-            opacity: 0;
-            transform: translateY(8px) scale(0.985);
-            filter: brightness(1.08);
-          }
-          55% {
-            opacity: 1;
-            filter: brightness(1.04);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            filter: brightness(1);
-          }
-        }
-
-        @keyframes modalIn {
+        @keyframes previewApply {
           from {
-            opacity: 0;
-            transform: translateY(18px) scale(0.985);
+            opacity: 0.72;
+            transform: translateY(5px) scale(0.992);
           }
           to {
             opacity: 1;
@@ -1463,44 +1235,38 @@ export default function ResultClient() {
           }
         }
 
-        @keyframes holoShift {
-          0% {
-            background-position: 0% 50%;
+        @keyframes sheetIn {
+          from {
+            opacity: 0;
+            transform: translateY(18px) scale(0.992);
           }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
           }
         }
 
-        .animate-preview-swap {
-          animation: previewSwap 320ms cubic-bezier(0.22, 1, 0.36, 1);
+        .animate-preview-apply {
+          animation: previewApply 240ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
-        .animate-modal-in {
-          animation: modalIn 260ms cubic-bezier(0.22, 1, 0.36, 1);
+        .animate-sheet-in {
+          animation: sheetIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
-        .animate-holo-shift {
-          animation: holoShift 8s ease-in-out infinite;
-          background-size: 220% 220%;
-        }
-
-        .amore-scrollbar {
+        .amore-rail {
           scrollbar-width: none;
           -ms-overflow-style: none;
+          overscroll-behavior-inline: contain;
         }
 
-        .amore-scrollbar::-webkit-scrollbar {
+        .amore-rail::-webkit-scrollbar {
           display: none;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .animate-preview-swap,
-          .animate-modal-in,
-          .animate-holo-shift {
+          .animate-preview-apply,
+          .animate-sheet-in {
             animation: none !important;
           }
 
@@ -1510,12 +1276,12 @@ export default function ResultClient() {
         }
       `}</style>
 
-      <main className="amoura-page min-h-screen overflow-x-hidden pb-28 lg:pb-6">
-        <header className="sticky top-0 z-30 border-b border-white/5 bg-[#080406]/85 px-4 py-3 backdrop-blur-2xl sm:px-6 lg:static lg:border-0 lg:bg-transparent lg:pt-5">
+      <main className="amoura-page min-h-screen overflow-x-hidden pb-24 lg:pb-6">
+        <header className="sticky top-0 z-30 border-b border-white/5 bg-[#080406]/88 px-4 py-3 backdrop-blur-2xl sm:px-6 lg:static lg:border-0 lg:bg-transparent lg:pt-5">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 lg:rounded-[1.35rem] lg:border lg:border-amoura-red-soft/20 lg:bg-black/45 lg:px-5 lg:py-3">
             <Link
               href="/dashboard"
-              className="inline-flex min-h-11 items-center gap-2 rounded-full px-2 text-sm font-semibold text-amoura-muted outline-none transition hover:text-amoura-cream focus-visible:ring-2 focus-visible:ring-amoura-red-soft focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              className="inline-flex min-h-11 items-center gap-2 rounded-full px-1 text-sm font-semibold text-amoura-muted outline-none transition hover:text-amoura-cream focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
             >
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -1527,7 +1293,7 @@ export default function ResultClient() {
                 AmoreFrame
               </p>
               <p className="mt-1 truncate text-[11px] text-amoura-muted sm:text-xs">
-                Private by design. Processed only in your browser.
+                Private preview, processed on your device
               </p>
             </div>
           </div>
@@ -1535,45 +1301,44 @@ export default function ResultClient() {
 
         <section className="px-3 py-3 sm:px-6 sm:py-4 lg:px-8">
           <div className="mx-auto max-w-7xl">
-            <section className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(300px,0.78fr)_minmax(440px,1.22fr)]">
-              <section className="relative rounded-[1.5rem] border border-amoura-red-soft/20 bg-black/45 p-2.5 backdrop-blur-xl sm:rounded-[1.75rem] sm:p-4 lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:min-h-[620px] lg:max-h-[860px]">
-                <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amoura-cream backdrop-blur-md sm:left-6 sm:top-6">
+            <section className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(300px,0.8fr)_minmax(420px,1.2fr)]">
+              <section className="relative rounded-[1.5rem] border border-amoura-red-soft/20 bg-black/45 p-2.5 backdrop-blur-xl sm:rounded-[1.75rem] sm:p-4 lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:min-h-[620px] lg:max-h-[850px]">
+                <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amoura-cream backdrop-blur-md sm:left-6 sm:top-6">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                   Live preview
                 </div>
 
-                <div className="flex h-[64svh] min-h-[430px] items-center justify-center sm:h-[70svh] sm:min-h-[540px] lg:h-full lg:min-h-0">
+                <div className="flex h-[61svh] min-h-[410px] items-center justify-center sm:h-[69svh] sm:min-h-[520px] lg:h-full lg:min-h-0">
                   <div
-                    key={previewKey}
-                    className="animate-preview-swap flex h-full w-full items-center justify-center"
+                    key={previewRevision}
+                    className="animate-preview-apply flex h-full w-full items-center justify-center"
                     aria-live="polite"
-                    aria-label={`${selectedDesign.name} preview updated`}
+                    aria-label={`${selectedDesign.name} preview`}
                   >
                     {selectedDesign.kind === "strip" ? (
                       <StripPreview
                         photos={previewPhotos}
                         design={selectedDesign}
                         filter={selectedFilter}
-                        caption={caption}
-                        captionPosition={captionPosition}
+                        caption={editor.caption}
+                        captionPosition={editor.captionPosition}
                         dateStampText={dateStampText}
                         filmNumberText={filmNumberText}
-                        stickers={stickers}
-                        onRemoveSticker={removeSticker}
+                        stickers={editor.stickers}
                       />
                     ) : (
                       <CardPreview
                         photo={
-                          previewPhotos[selectedPhotoIndex] ?? previewPhotos[0]
+                          previewPhotos[editor.selectedPhotoIndex] ??
+                          previewPhotos[0]
                         }
                         design={selectedDesign}
                         filter={selectedFilter}
-                        caption={caption}
-                        captionPosition={captionPosition}
+                        caption={editor.caption}
+                        captionPosition={editor.captionPosition}
                         dateStampText={dateStampText}
                         filmNumberText={filmNumberText}
-                        stickers={stickers}
-                        onRemoveSticker={removeSticker}
+                        stickers={editor.stickers}
                       />
                     )}
                   </div>
@@ -1581,90 +1346,129 @@ export default function ResultClient() {
               </section>
 
               <aside className="rounded-[1.5rem] border border-amoura-red-soft/20 bg-white/[0.035] p-4 backdrop-blur-xl sm:rounded-[1.75rem] sm:p-6 lg:max-h-[calc(100vh-2.5rem)] lg:overflow-y-auto">
-                <div className="max-w-xl">
-                  <p className="text-xs font-bold uppercase tracking-[0.24em] text-amoura-red-soft">
-                    Virtual memory booth
+                <section>
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-amoura-red-soft">
+                    Your final frame
                   </p>
-                  <h1 className="amoura-serif mt-2 text-[clamp(2rem,4vw,3.4rem)] leading-[0.95] text-amoura-cream">
-                    Make the frame feel like you.
+                  <h1 className="amoura-serif mt-2 text-[clamp(2rem,4vw,3.35rem)] leading-[0.96] text-amoura-cream">
+                    Make this memory feel like yours.
                   </h1>
-                  <p className="mt-3 max-w-lg text-sm leading-6 text-amoura-muted sm:text-base">
-                    Pick a design, add one sticker pack, finish the details, then
-                    save the final image to your device.
+                  <p className="mt-3 max-w-xl text-sm leading-6 text-amoura-muted sm:text-base">
+                    Move through one choice at a time. Your main preview updates
+                    only after you apply the changes, which keeps the editor
+                    fast and calm.
                   </p>
-                </div>
+                </section>
 
                 <button
                   type="button"
                   onClick={() => openWizardAt("design")}
-                  className="amoura-btn-primary mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft focus-visible:ring-offset-2 focus-visible:ring-offset-black sm:min-h-14"
+                  className="amoura-btn-primary mt-5 inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
                 >
                   <Wand2 className="h-4 w-4" aria-hidden="true" />
                   Customize your memory
                 </button>
 
-                <div className="mt-5 grid gap-2 rounded-2xl border border-amoura-red-soft/15 bg-black/25 p-3 sm:p-4">
-                  <SummaryRow
-                    label="Design"
-                    value={`${selectedDesign.name} · ${selectedDesign.collection}`}
-                    onEdit={() => openWizardAt("design")}
-                  />
-                  <SummaryRow
-                    label="Sticker pack"
-                    value={stickerSummary}
-                    onEdit={() => openWizardAt("stickers")}
-                  />
-                  <SummaryRow
-                    label="Filter"
-                    value={selectedFilter.name}
-                    onEdit={() => openWizardAt("filters")}
-                  />
-                  <SummaryRow
-                    label={captionLabel}
-                    value={caption || "Not set"}
-                    onEdit={() => openWizardAt("caption")}
-                  />
-                  <SummaryRow
-                    label="Details"
-                    value={detailSummary}
-                    onEdit={() => openWizardAt("caption")}
-                  />
-                </div>
+                <section className="mt-5">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-amoura-cream">
+                        Your look
+                      </p>
+                      <p className="mt-0.5 text-xs text-amoura-muted">
+                        Tap a section to edit it
+                      </p>
+                    </div>
+                    <SwipeHint className="lg:hidden" />
+                  </div>
 
-                <div className="mt-5 hidden grid-cols-2 gap-3 lg:grid">
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    disabled={isDownloading}
-                    className="amoura-btn-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold outline-none transition disabled:cursor-not-allowed disabled:opacity-70 focus-visible:ring-2 focus-visible:ring-amoura-red-soft focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                  <HorizontalRail
+                    label="Quick customization sections"
+                    className="mt-3 lg:grid lg:grid-cols-2 lg:overflow-visible lg:pr-0"
                   >
-                    {isDownloading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <Download className="h-4 w-4" aria-hidden="true" />
-                    )}
-                    Download
-                  </button>
+                    <QuickEditCard
+                      label="Design"
+                      value={selectedDesign.name}
+                      icon={<Rows3 className="h-4 w-4" aria-hidden="true" />}
+                      onClick={() => openWizardAt("design")}
+                    />
+                    <QuickEditCard
+                      label="Stickers"
+                      value={
+                        filledStickerCount === 0
+                          ? "None"
+                          : `${stickerPack.name}, ${filledStickerCount} placed`
+                      }
+                      icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+                      onClick={() => openWizardAt("stickers")}
+                    />
+                    <QuickEditCard
+                      label="Filter"
+                      value={selectedFilter.name}
+                      icon={<Wand2 className="h-4 w-4" aria-hidden="true" />}
+                      onClick={() => openWizardAt("filters")}
+                    />
+                    <QuickEditCard
+                      label="Text and details"
+                      value={
+                        editor.caption || dateStampText || filmNumberText || "Not set"
+                      }
+                      icon={<Type className="h-4 w-4" aria-hidden="true" />}
+                      onClick={() => openWizardAt("caption")}
+                    />
+                  </HorizontalRail>
+                </section>
 
-                  <button
-                    type="button"
-                    onClick={retakePhotos}
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-5 py-3.5 text-sm font-semibold text-amoura-cream outline-none transition hover:border-amoura-red-soft/45 focus-visible:ring-2 focus-visible:ring-amoura-red-soft focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                  >
-                    <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-                    Retake
-                  </button>
-                </div>
+                <section className="mt-5 rounded-2xl border border-amoura-red-soft/15 bg-black/25 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
+                        Ready to save
+                      </p>
+                      <p className="mt-1 truncate text-sm font-semibold text-amoura-cream">
+                        {selectedDesign.kind === "card"
+                          ? "Collectible card PNG"
+                          : "Three-photo strip PNG"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleDownload()}
+                      disabled={isDownloading}
+                      className="amoura-btn-primary inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+                    >
+                      {isDownloading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Download className="h-4 w-4" aria-hidden="true" />
+                      )}
+                      Save
+                    </button>
+                  </div>
+                </section>
 
-                <div className="mt-5 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.055] px-4 py-3">
-                  <p className="text-xs font-semibold text-emerald-100">
-                    Your photos stay on this device.
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-emerald-100/65">
-                    AmoreFrame does not upload or store the photos used on this
-                    page.
-                  </p>
-                </div>
+                <section className="mt-4 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.055] px-4 py-3">
+                  <div className="flex gap-3">
+                    <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" aria-hidden="true" />
+                    <div>
+                      <p className="text-xs font-semibold text-emerald-100">
+                        Photos stay on this device
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-emerald-100/65">
+                        Preview and export happen locally inside your browser.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <button
+                  type="button"
+                  onClick={retakePhotos}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/30 px-5 text-sm font-semibold text-amoura-cream outline-none transition hover:border-amoura-red-soft/45 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+                >
+                  <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+                  Retake photos
+                </button>
               </aside>
             </section>
           </div>
@@ -1672,7 +1476,7 @@ export default function ResultClient() {
       </main>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#090507]/92 px-3 pt-3 backdrop-blur-2xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#090507]/94 px-3 pt-3 backdrop-blur-2xl lg:hidden"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}
       >
         <div className="mx-auto grid max-w-lg grid-cols-[1fr_auto] gap-2.5">
@@ -1686,9 +1490,9 @@ export default function ResultClient() {
           </button>
           <button
             type="button"
-            onClick={handleDownload}
+            onClick={() => void handleDownload()}
             disabled={isDownloading}
-            className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-amoura-red-soft/25 bg-black/50 text-amoura-cream outline-none transition active:scale-95 disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+            className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-amoura-red-soft/25 bg-black/55 text-amoura-cream outline-none transition active:scale-95 disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
             aria-label="Download memory"
           >
             {isDownloading ? (
@@ -1703,38 +1507,11 @@ export default function ResultClient() {
       {wizardOpen ? (
         <WizardModal
           photos={previewPhotos}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-          selectedDesign={selectedDesign}
-          selectedDesignId={selectedDesignId}
-          setSelectedDesignId={setSelectedDesignId}
-          selectedPhotoIndex={selectedPhotoIndex}
-          setSelectedPhotoIndex={setSelectedPhotoIndex}
-          stickers={stickers}
-          selectedStickerPackId={selectedStickerPackId}
-          onSelectStickerPack={applyStickerPack}
-          onRemoveSticker={removeSticker}
-          selectedFilter={selectedFilter}
-          selectedFilterId={selectedFilterId}
-          setSelectedFilterId={setSelectedFilterId}
-          caption={caption}
-          setCaption={setCaption}
-          captionPosition={captionPosition}
-          setCaptionPosition={setCaptionPosition}
-          dateStampMode={dateStampMode}
-          setDateStampMode={setDateStampMode}
-          dateStyle={dateStyle}
-          setDateStyle={setDateStyle}
-          filmNumberMode={filmNumberMode}
-          setFilmNumberMode={setFilmNumberMode}
-          dateStampText={dateStampText}
-          filmNumberText={filmNumberText}
-          previewKey={previewKey}
-          stepIndex={wizardStepIndex}
-          setStepIndex={setWizardStepIndex}
+          initialState={editor}
+          initialStepIndex={wizardStartStep}
+          captureDate={captureDate}
           onClose={closeWizard}
+          onApply={applyEditorChanges}
           onDownload={handleDownload}
           isDownloading={isDownloading}
           onRetake={retakePhotos}
@@ -1744,129 +1521,144 @@ export default function ResultClient() {
   )
 }
 
-function SummaryRow({
+function QuickEditCard({
   label,
   value,
-  onEdit,
+  icon,
+  onClick,
 }: {
   label: string
   value: string
-  onEdit: () => void
+  icon: ReactNode
+  onClick: () => void
 }) {
   return (
-    <div className="flex min-h-12 items-center justify-between gap-3 rounded-xl px-1.5 py-1">
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.14em] text-amoura-muted">
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-h-20 w-[72vw] max-w-[260px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-white/8 bg-black/20 p-3 text-left outline-none transition hover:border-amoura-red-soft/30 focus-visible:ring-2 focus-visible:ring-amoura-red-soft lg:w-auto lg:max-w-none"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amoura-red-soft/15 bg-amoura-red/10 text-amoura-red-soft">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[10px] uppercase tracking-[0.14em] text-amoura-muted">
           {label}
-        </p>
-        <p className="mt-0.5 truncate text-sm font-semibold text-amoura-cream">
+        </span>
+        <span className="mt-1 block truncate text-sm font-semibold text-amoura-cream">
           {value}
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 text-amoura-muted outline-none transition hover:border-amoura-red-soft/35 hover:text-amoura-cream focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
-        aria-label={`Edit ${label}`}
+        </span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-amoura-muted transition group-hover:translate-x-0.5" aria-hidden="true" />
+    </button>
+  )
+}
+
+function SwipeHint({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-amoura-muted ${className}`}
+    >
+      <MoveHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+      Swipe
+    </span>
+  )
+}
+
+function HorizontalRail({
+  children,
+  label,
+  className = "",
+}: {
+  children: ReactNode
+  label: string
+  className?: string
+}) {
+  return (
+    <div className="relative">
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#0b0608] to-transparent lg:hidden" />
+      <div
+        className={`amore-rail flex snap-x snap-mandatory gap-2.5 overflow-x-auto pr-10 ${className}`}
+        aria-label={label}
       >
-        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
+        {children}
+      </div>
     </div>
   )
 }
 
-function tabClass(active: boolean) {
-  return `inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2.5 text-xs font-semibold outline-none transition sm:text-sm ${
-    active
-      ? "bg-amoura-red-soft text-black shadow-[0_8px_24px_rgba(194,31,58,0.24)]"
-      : "text-amoura-muted hover:text-amoura-cream focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
-  }`
-}
-
 function WizardModal({
   photos,
-  activeTab,
-  setActiveTab,
-  selectedCategory,
-  setSelectedCategory,
-  selectedDesign,
-  selectedDesignId,
-  setSelectedDesignId,
-  selectedPhotoIndex,
-  setSelectedPhotoIndex,
-  stickers,
-  selectedStickerPackId,
-  onSelectStickerPack,
-  onRemoveSticker,
-  selectedFilter,
-  selectedFilterId,
-  setSelectedFilterId,
-  caption,
-  setCaption,
-  captionPosition,
-  setCaptionPosition,
-  dateStampMode,
-  setDateStampMode,
-  dateStyle,
-  setDateStyle,
-  filmNumberMode,
-  setFilmNumberMode,
-  dateStampText,
-  filmNumberText,
-  previewKey,
-  stepIndex,
-  setStepIndex,
+  initialState,
+  initialStepIndex,
+  captureDate,
   onClose,
+  onApply,
   onDownload,
   isDownloading,
   onRetake,
 }: {
   photos: string[]
-  activeTab: "strips" | "cards"
-  setActiveTab: (tab: "strips" | "cards") => void
-  selectedCategory: DesignCategoryId
-  setSelectedCategory: (category: DesignCategoryId) => void
-  selectedDesign: DesignOption
-  selectedDesignId: string
-  setSelectedDesignId: (id: string) => void
-  selectedPhotoIndex: number
-  setSelectedPhotoIndex: (index: number) => void
-  stickers: StickerMap
-  selectedStickerPackId: StickerPackId
-  onSelectStickerPack: (packId: StickerPackId) => void
-  onRemoveSticker: (slot: StickerSlot) => void
-  selectedFilter: FilterOption
-  selectedFilterId: string
-  setSelectedFilterId: (id: string) => void
-  caption: string
-  setCaption: (value: string) => void
-  captionPosition: CaptionPosition
-  setCaptionPosition: (position: CaptionPosition) => void
-  dateStampMode: DateStampMode
-  setDateStampMode: (mode: DateStampMode) => void
-  dateStyle: DateStyle
-  setDateStyle: (style: DateStyle) => void
-  filmNumberMode: FilmNumberMode
-  setFilmNumberMode: (mode: FilmNumberMode) => void
-  dateStampText: string
-  filmNumberText: string
-  previewKey: string
-  stepIndex: number
-  setStepIndex: (updater: number | ((current: number) => number)) => void
+  initialState: EditorState
+  initialStepIndex: number
+  captureDate: Date
   onClose: () => void
-  onDownload: () => void
+  onApply: (state: EditorState) => void
+  onDownload: (state: EditorState) => Promise<void>
   isDownloading: boolean
   onRetake: () => void
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null)
+  const [draft, setDraft] = useState<EditorState>(initialState)
+  const [stepIndex, setStepIndex] = useState(initialStepIndex)
+  const deferredCaption = useDeferredValue(draft.caption)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+
   const step = WIZARD_STEPS[stepIndex]?.id ?? "design"
-  const isFirst = stepIndex === 0
-  const isBeforeLast = stepIndex === WIZARD_STEPS.length - 2
+  const selectedDesign = useMemo(
+    () => getDesignById(draft.selectedDesignId),
+    [draft.selectedDesignId]
+  )
+  const selectedFilter = useMemo(
+    () => getFilterById(draft.selectedFilterId),
+    [draft.selectedFilterId]
+  )
+  const dateStampText = useMemo(
+    () => formatDateStamp(captureDate, draft.dateStampMode),
+    [captureDate, draft.dateStampMode]
+  )
+  const filmNumberText = useMemo(
+    () => formatFilmNumber(captureDate, draft.filmNumberMode),
+    [captureDate, draft.filmNumberMode]
+  )
+
+  const patchDraft = useCallback((patch: Partial<EditorState>) => {
+    setDraft((current) => ({ ...current, ...patch }))
+  }, [])
+
+  const removeDraftSticker = useCallback((slot: StickerSlot) => {
+    setDraft((current) => {
+      const stickers = { ...current.stickers }
+      delete stickers[slot]
+      return { ...current, stickers }
+    })
+  }, [])
+
+  const addDraftSticker = useCallback((emoji: string) => {
+    setDraft((current) => {
+      const nextSlot = STICKER_SLOTS.find((slot) => !current.stickers[slot])
+      if (!nextSlot) return current
+
+      return {
+        ...current,
+        selectedStickerPackId: "none",
+        stickers: { ...current.stickers, [nextSlot]: emoji },
+      }
+    })
+  }, [])
 
   useEffect(() => {
-    const previousFocus = document.activeElement as HTMLElement | null
     const previousOverflow = document.body.style.overflow
+    const previousFocus = document.activeElement as HTMLElement | null
     document.body.style.overflow = "hidden"
     closeButtonRef.current?.focus()
 
@@ -1874,34 +1666,6 @@ function WizardModal({
       if (event.key === "Escape") {
         event.preventDefault()
         onClose()
-        return
-      }
-
-      if (event.key !== "Tab" || !dialogRef.current) return
-
-      const focusable = Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), a[href], textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-      ).filter(
-        (element) =>
-          element.tabIndex >= 0 &&
-          !element.hasAttribute("hidden") &&
-          element.getAttribute("aria-hidden") !== "true" &&
-          element.offsetParent !== null
-      )
-
-      if (focusable.length === 0) return
-
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
       }
     }
 
@@ -1914,31 +1678,37 @@ function WizardModal({
     }
   }, [onClose])
 
+  const isFirst = stepIndex === 0
+  const isLast = stepIndex === WIZARD_STEPS.length - 1
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-md sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/68 p-1.5 backdrop-blur-sm sm:items-center sm:p-4"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div
-        ref={dialogRef}
+      <section
         role="dialog"
         aria-modal="true"
-        aria-labelledby="amoreframe-dialog-title"
-        className="animate-modal-in flex h-[100dvh] w-full flex-col overflow-hidden border border-amoura-red-soft/20 bg-[#0b0608] shadow-2xl sm:h-auto sm:max-h-[94vh] sm:max-w-3xl sm:rounded-[2rem] lg:max-w-4xl"
+        aria-labelledby="amore-editor-title"
+        className="animate-sheet-in flex max-h-[78dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[1.75rem] border border-amoura-red-soft/20 bg-[#0b0608] shadow-2xl sm:max-h-[82vh] sm:rounded-[1.75rem]"
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/5 px-4 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5">
+        <div className="shrink-0 px-4 pt-2 sm:hidden">
+          <div className="mx-auto h-1 w-10 rounded-full bg-white/15" />
+        </div>
+
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-white/5 px-4 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-5">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-amoura-red-soft sm:text-[11px]">
-              AmoreFrame editor
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amoura-red-soft">
+              Step {stepIndex + 1} of {WIZARD_STEPS.length}
             </p>
             <h2
-              id="amoreframe-dialog-title"
-              className="amoura-serif mt-1 truncate text-2xl text-amoura-cream sm:text-3xl"
+              id="amore-editor-title"
+              className="amoura-serif mt-1 truncate text-xl text-amoura-cream sm:text-2xl"
             >
-              {STEP_TITLES[step]}
+              {WIZARD_STEPS[stepIndex]?.label}
             </h2>
           </div>
           <button
@@ -1946,78 +1716,60 @@ function WizardModal({
             type="button"
             onClick={onClose}
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 text-amoura-muted outline-none transition hover:text-amoura-cream focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
-            aria-label="Close editor"
+            aria-label="Close editor and discard unapplied changes"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
-        </div>
+        </header>
 
-        <div className="shrink-0 px-4 py-2.5 sm:px-6 sm:py-3">
-          <div
-            className="flex items-center gap-2"
-            role="tablist"
-            aria-label="Customization progress"
-          >
+        <div className="shrink-0 px-4 py-2.5 sm:px-5">
+          <div className="flex gap-1.5" aria-label="Customization progress">
             {WIZARD_STEPS.map((wizardStep, index) => (
               <button
                 key={wizardStep.id}
                 type="button"
-                role="tab"
-                aria-selected={index === stepIndex}
-                aria-label={`Go to ${wizardStep.label}`}
                 onClick={() => setStepIndex(index)}
-                className={`min-h-2 flex-1 rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
+                className={`h-1.5 flex-1 rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
                   index === stepIndex
                     ? "bg-amoura-red-soft"
                     : index < stepIndex
                       ? "bg-amoura-red-soft/45"
                       : "bg-white/10"
                 }`}
+                aria-label={`Go to ${wizardStep.shortLabel}`}
+                aria-current={index === stepIndex ? "step" : undefined}
               />
-            ))}
-          </div>
-          <div className="mt-2 flex justify-between text-[9px] uppercase tracking-[0.08em] text-amoura-muted sm:text-[10px]">
-            {WIZARD_STEPS.map((wizardStep, index) => (
-              <span
-                key={wizardStep.id}
-                className={index === stepIndex ? "text-amoura-cream" : ""}
-              >
-                {wizardStep.label}
-              </span>
             ))}
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3 sm:px-5">
           {step !== "download" ? (
-            <div className="sticky top-0 z-20 -mx-4 mb-4 border-y border-white/5 bg-[#0b0608]/92 px-4 py-2.5 backdrop-blur-xl sm:static sm:mx-0 sm:mb-5 sm:rounded-2xl sm:border sm:bg-black/20 sm:px-4 sm:py-3">
-              <div
-                key={previewKey}
-                className="animate-preview-swap flex h-[30svh] min-h-[220px] max-h-[320px] items-center justify-center sm:h-72"
-              >
+            <div className="mb-3 rounded-2xl border border-white/6 bg-black/20 p-2.5">
+              <div className="flex h-32 items-center justify-center sm:h-40">
                 {selectedDesign.kind === "strip" ? (
                   <StripPreview
                     photos={photos}
                     design={selectedDesign}
                     filter={selectedFilter}
-                    caption={caption}
-                    captionPosition={captionPosition}
+                    caption={deferredCaption}
+                    captionPosition={draft.captionPosition}
                     dateStampText={dateStampText}
                     filmNumberText={filmNumberText}
-                    stickers={stickers}
-                    onRemoveSticker={onRemoveSticker}
+                    stickers={draft.stickers}
+                    onRemoveSticker={removeDraftSticker}
                   />
                 ) : (
                   <CardPreview
-                    photo={photos[selectedPhotoIndex] ?? photos[0]}
+                    photo={photos[draft.selectedPhotoIndex] ?? photos[0]}
                     design={selectedDesign}
                     filter={selectedFilter}
-                    caption={caption}
-                    captionPosition={captionPosition}
+                    caption={deferredCaption}
+                    captionPosition={draft.captionPosition}
                     dateStampText={dateStampText}
                     filmNumberText={filmNumberText}
-                    stickers={stickers}
-                    onRemoveSticker={onRemoveSticker}
+                    stickers={draft.stickers}
+                    onRemoveSticker={removeDraftSticker}
                   />
                 )}
               </div>
@@ -2026,86 +1778,73 @@ function WizardModal({
 
           {step === "design" ? (
             <DesignStep
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-              selectedDesignId={selectedDesignId}
-              setSelectedDesignId={setSelectedDesignId}
+              state={draft}
               photos={photos}
-              selectedPhotoIndex={selectedPhotoIndex}
-              setSelectedPhotoIndex={setSelectedPhotoIndex}
               filter={selectedFilter}
+              onChange={patchDraft}
             />
           ) : null}
 
           {step === "stickers" ? (
             <StickerStep
-              stickers={stickers}
-              selectedStickerPackId={selectedStickerPackId}
-              onSelect={onSelectStickerPack}
+              state={draft}
+              onChange={patchDraft}
+              onAddSticker={addDraftSticker}
             />
           ) : null}
 
           {step === "filters" ? (
             <FilterStep
-              previewPhoto={photos[selectedPhotoIndex] ?? photos[0]}
-              selectedFilterId={selectedFilterId}
-              setSelectedFilterId={setSelectedFilterId}
+              previewPhoto={photos[draft.selectedPhotoIndex] ?? photos[0]}
+              selectedFilterId={draft.selectedFilterId}
+              onSelect={(selectedFilterId) =>
+                patchDraft({ selectedFilterId })
+              }
             />
           ) : null}
 
           {step === "caption" ? (
-            <CaptionStep
-              kind={selectedDesign.kind}
-              caption={caption}
-              setCaption={setCaption}
-              captionPosition={captionPosition}
-              setCaptionPosition={setCaptionPosition}
-              dateStampMode={dateStampMode}
-              setDateStampMode={setDateStampMode}
-              dateStyle={dateStyle}
-              setDateStyle={setDateStyle}
-              filmNumberMode={filmNumberMode}
-              setFilmNumberMode={setFilmNumberMode}
+            <CaptionStep state={draft} onChange={patchDraft} />
+          ) : null}
+
+          {step === "details" ? (
+            <DetailsStep
+              state={draft}
               dateStampText={dateStampText}
               filmNumberText={filmNumberText}
+              onChange={patchDraft}
             />
           ) : null}
 
           {step === "download" ? (
             <DownloadStep
-              selectedDesign={selectedDesign}
-              photo={photos[selectedPhotoIndex] ?? photos[0]}
+              state={draft}
               photos={photos}
-              filter={selectedFilter}
-              caption={caption}
-              captionPosition={captionPosition}
+              selectedDesign={selectedDesign}
+              selectedFilter={selectedFilter}
               dateStampText={dateStampText}
               filmNumberText={filmNumberText}
-              stickers={stickers}
-              onRemoveSticker={onRemoveSticker}
-              onDownload={onDownload}
               isDownloading={isDownloading}
+              onDownload={() => onDownload(draft)}
+              onApply={() => onApply(draft)}
               onRetake={onRetake}
-              onClose={onClose}
             />
           ) : null}
         </div>
 
-        {step !== "download" ? (
-          <div
-            className="flex shrink-0 items-center justify-between gap-2.5 border-t border-white/5 bg-[#0b0608]/96 px-4 pt-3 backdrop-blur-xl sm:px-6 sm:pt-4"
-            style={{ paddingBottom: "max(env(safe-area-inset-bottom), 1rem)" }}
+        {!isLast ? (
+          <footer
+            className="flex shrink-0 items-center justify-between gap-2.5 border-t border-white/5 bg-[#0b0608]/96 px-4 pt-3 backdrop-blur-xl sm:px-5"
+            style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.9rem)" }}
           >
             <button
               type="button"
               onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
-              className={`inline-flex min-h-12 items-center gap-1.5 rounded-full border border-amoura-red-soft/20 bg-black/35 px-4 text-sm font-semibold text-amoura-cream outline-none transition hover:border-amoura-red-soft/45 focus-visible:ring-2 focus-visible:ring-amoura-red-soft sm:px-5 ${
+              className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border border-amoura-red-soft/20 bg-black/35 px-4 text-sm font-semibold text-amoura-cream outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
                 isFirst ? "invisible" : ""
               }`}
-              aria-hidden={isFirst}
               tabIndex={isFirst ? -1 : 0}
+              aria-hidden={isFirst}
             >
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Back
@@ -2118,159 +1857,159 @@ function WizardModal({
                   Math.min(WIZARD_STEPS.length - 1, current + 1)
                 )
               }
-              className="amoura-btn-primary inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+              className="amoura-btn-primary inline-flex min-h-11 flex-1 items-center justify-center rounded-full px-5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
             >
-              {isBeforeLast ? "Review and download" : "Next"}
+              {step === "details" ? "Review" : "Next"}
             </button>
-          </div>
+          </footer>
         ) : null}
-      </div>
+      </section>
     </div>
   )
 }
 
 function DesignStep({
-  activeTab,
-  setActiveTab,
-  selectedCategory,
-  setSelectedCategory,
-  selectedDesignId,
-  setSelectedDesignId,
+  state,
   photos,
-  selectedPhotoIndex,
-  setSelectedPhotoIndex,
   filter,
+  onChange,
 }: {
-  activeTab: "strips" | "cards"
-  setActiveTab: (tab: "strips" | "cards") => void
-  selectedCategory: DesignCategoryId
-  setSelectedCategory: (category: DesignCategoryId) => void
-  selectedDesignId: string
-  setSelectedDesignId: (id: string) => void
+  state: EditorState
   photos: string[]
-  selectedPhotoIndex: number
-  setSelectedPhotoIndex: (index: number) => void
   filter: FilterOption
+  onChange: (patch: Partial<EditorState>) => void
 }) {
-  const baseList: DesignOption[] =
-    activeTab === "strips" ? STRIP_DESIGNS : CARD_DESIGNS
-
-  const availableCategories = useMemo(
-    () =>
-      DESIGN_CATEGORIES.filter((category) =>
-        baseList.some((design) => design.categories.includes(category.id))
-      ),
-    [baseList]
+  const list = state.activeTab === "strips" ? ALL_STRIP_DESIGNS : ALL_CARD_DESIGNS
+  const availableCategories = DESIGN_CATEGORIES.filter((category) =>
+    list.some((design) => category.designIds.includes(design.id))
   )
-
   const effectiveCategory = availableCategories.some(
-    (category) => category.id === selectedCategory
+    (category) => category.id === state.selectedCategory
   )
-    ? selectedCategory
-    : availableCategories[0]?.id
-
-  const list = useMemo(
-    () =>
-      baseList.filter((design) =>
-        effectiveCategory
-          ? design.categories.includes(effectiveCategory)
-          : true
-      ),
-    [baseList, effectiveCategory]
+    ? state.selectedCategory
+    : availableCategories[0]?.id ?? "trending"
+  const activeCategory =
+    DESIGN_CATEGORIES.find((category) => category.id === effectiveCategory) ??
+    DESIGN_CATEGORIES[0]
+  const filteredDesigns = list.filter((design) =>
+    activeCategory.designIds.includes(design.id)
   )
 
-  function changeDesignType(tab: "strips" | "cards") {
-    setActiveTab(tab)
-
-    const currentDesign = ALL_DESIGNS.find(
-      (design) => design.id === selectedDesignId
+  function selectCategory(categoryId: DesignCategoryId) {
+    const category = DESIGN_CATEGORIES.find((item) => item.id === categoryId)
+    const currentIsVisible = category?.designIds.includes(state.selectedDesignId)
+    const firstDesign = list.find((design) =>
+      category?.designIds.includes(design.id)
     )
-    const targetKind = tab === "strips" ? "strip" : "card"
 
-    if (currentDesign?.kind === targetKind) return
+    onChange({
+      selectedCategory: categoryId,
+      selectedDesignId:
+        currentIsVisible || !firstDesign ? state.selectedDesignId : firstDesign.id,
+    })
+  }
 
-    const targetList = tab === "strips" ? STRIP_DESIGNS : CARD_DESIGNS
+  function switchType(activeTab: "strips" | "cards") {
+    const targetList = activeTab === "strips" ? ALL_STRIP_DESIGNS : ALL_CARD_DESIGNS
+    const currentDesign = getDesignById(state.selectedDesignId)
+    const targetKind = activeTab === "strips" ? "strip" : "card"
+    const category = DESIGN_CATEGORIES.find(
+      (item) => item.id === state.selectedCategory
+    )
     const nextDesign =
-      targetList.find((design) =>
-        design.categories.includes(selectedCategory)
-      ) ?? targetList[0]
+      targetList.find((design) => category?.designIds.includes(design.id)) ??
+      targetList[0]
 
-    if (nextDesign) setSelectedDesignId(nextDesign.id)
+    onChange({
+      activeTab,
+      selectedDesignId:
+        currentDesign.kind === targetKind ? currentDesign.id : nextDesign.id,
+    })
   }
 
   return (
-    <div className="pb-2">
-      <div className="mb-4 inline-flex w-full items-center gap-1 rounded-full border border-amoura-red-soft/15 bg-black/25 p-1">
+    <div className="pb-1">
+      <div className="inline-flex w-full items-center gap-1 rounded-full border border-amoura-red-soft/15 bg-black/25 p-1">
         <button
           type="button"
-          onClick={() => changeDesignType("strips")}
-          className={tabClass(activeTab === "strips")}
-          aria-pressed={activeTab === "strips"}
+          onClick={() => switchType("strips")}
+          className={tabClass(state.activeTab === "strips")}
+          aria-pressed={state.activeTab === "strips"}
         >
           <Rows3 className="h-4 w-4" aria-hidden="true" />
           Photo strips
         </button>
         <button
           type="button"
-          onClick={() => changeDesignType("cards")}
-          className={tabClass(activeTab === "cards")}
-          aria-pressed={activeTab === "cards"}
+          onClick={() => switchType("cards")}
+          className={tabClass(state.activeTab === "cards")}
+          aria-pressed={state.activeTab === "cards"}
         >
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           Holo cards
         </button>
       </div>
 
-      <div
-        className="amore-scrollbar -mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-3 sm:-mx-0 sm:px-0"
-        aria-label="Design categories"
-      >
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
+          Browse collections
+        </p>
+        <SwipeHint />
+      </div>
+
+      <HorizontalRail label="Design categories" className="mt-2.5">
         {availableCategories.map((category) => {
-          const active = effectiveCategory === category.id
+          const active = category.id === effectiveCategory
 
           return (
             <button
               key={category.id}
               type="button"
-              onClick={() => setSelectedCategory(category.id)}
-              aria-pressed={active}
-              className={`min-h-11 shrink-0 snap-start rounded-full border px-3.5 text-xs font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
+              onClick={() => selectCategory(category.id)}
+              className={`min-h-10 shrink-0 snap-start rounded-full border px-3.5 text-xs font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
                 active
                   ? "border-amoura-red-soft bg-amoura-red/15 text-amoura-cream"
                   : "border-white/10 bg-black/20 text-amoura-muted hover:border-white/20 hover:text-amoura-cream"
               }`}
+              aria-pressed={active}
             >
               <span aria-hidden="true">{category.emoji}</span> {category.label}
             </button>
           )
         })}
-      </div>
+      </HorizontalRail>
 
-      {activeTab === "cards" && photos.length > 1 ? (
-        <div className="mb-4 rounded-2xl border border-white/8 bg-black/20 p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
-            Card photo
-          </p>
-          <div className="mt-2 flex gap-2 overflow-x-auto">
+      {state.activeTab === "cards" && photos.length > 1 ? (
+        <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
+              Card photo
+            </p>
+            <SwipeHint />
+          </div>
+          <HorizontalRail label="Choose a card photo" className="mt-2.5">
             {photos.map((photo, index) => {
-              const active = selectedPhotoIndex === index
+              const active = state.selectedPhotoIndex === index
 
               return (
                 <button
                   key={`${photo}-${index}`}
                   type="button"
-                  onClick={() => setSelectedPhotoIndex(index)}
-                  aria-pressed={active}
-                  className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
+                  onClick={() => onChange({ selectedPhotoIndex: index })}
+                  className={`relative h-16 w-16 shrink-0 snap-start overflow-hidden rounded-xl border-2 outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
                     active
                       ? "border-amoura-red-soft"
                       : "border-white/10 hover:border-white/30"
                   }`}
+                  aria-label={`Use captured shot ${index + 1}`}
+                  aria-pressed={active}
                 >
                   <img
                     src={photo}
-                    alt={`Use captured shot ${index + 1}`}
+                    alt=""
                     className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                   {active ? (
                     <span className="absolute inset-0 flex items-center justify-center bg-black/25">
@@ -2282,116 +2021,121 @@ function DesignStep({
                 </button>
               )
             })}
-          </div>
+          </HorizontalRail>
         </div>
       ) : null}
 
-      <div
-        key={`${activeTab}-${effectiveCategory}`}
-        className="animate-preview-swap amore-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4"
-      >
-        {list.map((design) => {
-          const active = selectedDesignId === design.id
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-amoura-cream">
+            {activeCategory.emoji} {activeCategory.label}
+          </p>
+          <p className="mt-0.5 text-xs text-amoura-muted">
+            The next design peeks in to invite a swipe
+          </p>
+        </div>
+        <SwipeHint />
+      </div>
+
+      <HorizontalRail label={`${activeCategory.label} designs`} className="mt-3 pb-2">
+        {filteredDesigns.map((design) => {
+          const active = state.selectedDesignId === design.id
 
           return (
             <button
               key={design.id}
               type="button"
-              onClick={() => setSelectedDesignId(design.id)}
-              aria-pressed={active}
-              aria-label={`Select ${design.name}, ${design.collection}`}
-              className={`group w-[44vw] max-w-[190px] shrink-0 snap-start rounded-2xl border p-2.5 text-left outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amoura-red-soft sm:w-auto sm:max-w-none ${
+              onClick={() => onChange({ selectedDesignId: design.id })}
+              className={`w-[41vw] max-w-[170px] shrink-0 snap-start rounded-2xl border p-2 text-left outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amoura-red-soft sm:w-40 ${
                 active
-                  ? "border-amoura-red-soft bg-amoura-red/10 shadow-[0_12px_36px_rgba(194,31,58,0.16)]"
-                  : "border-white/8 bg-black/20 hover:-translate-y-0.5 hover:border-white/18"
-              }`}
+                  ? "border-amoura-red-soft bg-amoura-red/10"
+                  : "border-white/8 bg-black/20 hover:border-white/18"
+              } [content-visibility:auto] [contain-intrinsic-size:160px_280px]`}
+              aria-label={`Select ${design.name}`}
+              aria-pressed={active}
             >
-              <div className="relative">
-                {design.kind === "strip" ? (
-                  <StripPoster
-                    design={design}
-                    photo={photos[0]}
-                    filter={filter}
-                    active={active}
-                  />
-                ) : (
-                  <CardPoster
-                    design={design}
-                    photo={photos[selectedPhotoIndex] ?? photos[0]}
-                    filter={filter}
-                    active={active}
-                  />
-                )}
-              </div>
-              <div className="mt-2 min-w-0">
-                <p className="truncate text-sm font-semibold text-amoura-cream">
-                  {design.name}
-                </p>
-                <p className="mt-0.5 truncate text-[11px] text-amoura-muted">
-                  {design.collection}
-                </p>
-              </div>
+              {design.kind === "strip" ? (
+                <StripPoster
+                  design={design}
+                  photo={photos[0]}
+                  filter={filter}
+                  active={active}
+                />
+              ) : (
+                <CardPoster
+                  design={design}
+                  photo={photos[state.selectedPhotoIndex] ?? photos[0]}
+                  filter={filter}
+                  active={active}
+                />
+              )}
+              <p className="mt-2 truncate text-sm font-semibold text-amoura-cream">
+                {design.name}
+              </p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-amoura-muted">
+                {design.subtitle}
+              </p>
             </button>
           )
         })}
-      </div>
+      </HorizontalRail>
     </div>
   )
 }
 
 function StickerStep({
-  stickers,
-  selectedStickerPackId,
-  onSelect,
+  state,
+  onChange,
+  onAddSticker,
 }: {
-  stickers: StickerMap
-  selectedStickerPackId: StickerPackId
-  onSelect: (packId: StickerPackId) => void
+  state: EditorState
+  onChange: (patch: Partial<EditorState>) => void
+  onAddSticker: (emoji: string) => void
 }) {
-  const filledCount = STICKER_SLOTS.filter((slot) => stickers[slot]).length
+  const filledCount = STICKER_SLOTS.filter((slot) => state.stickers[slot]).length
 
   return (
-    <div className="pb-2">
-      <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
-        <p className="text-sm leading-6 text-amoura-muted">
-          Pick one pack. AmoreFrame places the stickers automatically, so the
-          layout stays balanced. Tap any placed sticker in the preview to
-          remove it.
+    <div className="pb-1">
+      <div className="rounded-2xl border border-white/8 bg-black/20 px-3.5 py-3">
+        <p className="text-sm leading-5 text-amoura-muted">
+          Pick one balanced pack. You can remove any placed sticker by tapping
+          it in the preview.
         </p>
-        <p className="mt-2 text-xs font-semibold text-amoura-cream">
+        <p className="mt-1.5 text-xs font-semibold text-amoura-cream">
           {filledCount === 0 ? "No stickers placed" : `${filledCount} stickers placed`}
         </p>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
+          Sticker packs
+        </p>
+        <SwipeHint />
+      </div>
+
+      <HorizontalRail label="Sticker packs" className="mt-2.5 pb-2">
         {STICKER_PACKS.map((pack) => {
-          const active = selectedStickerPackId === pack.id
-          const icons = Object.values(pack.stickers)
+          const active = state.selectedStickerPackId === pack.id
 
           return (
             <button
               key={pack.id}
               type="button"
-              onClick={() => onSelect(pack.id)}
-              aria-pressed={active}
-              className={`min-h-28 rounded-2xl border p-3 text-left outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
+              onClick={() =>
+                onChange({
+                  selectedStickerPackId: pack.id,
+                  stickers: { ...pack.stickers },
+                })
+              }
+              className={`min-h-28 w-36 shrink-0 snap-start rounded-2xl border p-3 text-left outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
                 active
                   ? "border-amoura-red-soft bg-amoura-red/12"
                   : "border-white/8 bg-black/20 hover:border-white/20"
               }`}
+              aria-pressed={active}
             >
-              <div className="flex min-h-8 items-center gap-1 text-lg">
-                {icons.length > 0 ? (
-                  icons.slice(0, 4).map((emoji, index) => (
-                    <span key={`${emoji}-${index}`} aria-hidden="true">
-                      {emoji}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-xs uppercase tracking-[0.16em] text-amoura-muted">
-                    Clean
-                  </span>
-                )}
+              <div className="min-h-7 text-lg" aria-hidden="true">
+                {pack.preview}
               </div>
               <div className="mt-2 flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -2409,6 +2153,36 @@ function StickerStep({
             </button>
           )
         })}
+      </HorizontalRail>
+
+      <div className="mt-4 rounded-2xl border border-white/8 bg-black/20 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
+              Quick add
+            </p>
+            <p className="mt-0.5 text-[11px] text-amoura-muted">
+              Keeps the original single-sticker option
+            </p>
+          </div>
+          <span className="text-xs text-amoura-muted">
+            {Math.max(0, STICKER_SLOTS.length - filledCount)} spots left
+          </span>
+        </div>
+        <HorizontalRail label="Individual stickers" className="mt-2.5">
+          {STICKER_OPTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => onAddSticker(emoji)}
+              disabled={filledCount >= STICKER_SLOTS.length}
+              className="flex h-12 w-12 shrink-0 snap-start items-center justify-center rounded-xl border border-white/8 bg-black/25 text-xl outline-none transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+              aria-label={`Add ${emoji} sticker`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </HorizontalRail>
       </div>
     </div>
   )
@@ -2417,52 +2191,229 @@ function StickerStep({
 function FilterStep({
   previewPhoto,
   selectedFilterId,
-  setSelectedFilterId,
+  onSelect,
 }: {
   previewPhoto?: string
   selectedFilterId: string
-  setSelectedFilterId: (id: string) => void
+  onSelect: (id: string) => void
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 pb-2 sm:grid-cols-3">
-      {FILTERS.map((filter) => {
-        const active = selectedFilterId === filter.id
+    <div className="pb-1">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-amoura-cream">
+            Keep the edit subtle
+          </p>
+          <p className="mt-0.5 text-xs text-amoura-muted">
+            Swipe through natural, warm, dreamy, and film looks
+          </p>
+        </div>
+        <SwipeHint />
+      </div>
+
+      <HorizontalRail label="Photo filters" className="mt-3 pb-2">
+        {FILTERS.map((filter) => {
+          const active = selectedFilterId === filter.id
+
+          return (
+            <button
+              key={filter.id}
+              type="button"
+              onClick={() => onSelect(filter.id)}
+              className={`w-36 shrink-0 snap-start overflow-hidden rounded-2xl border text-left outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
+                active
+                  ? "border-amoura-red-soft bg-amoura-red/10"
+                  : "border-white/8 bg-black/20 hover:border-white/20"
+              }`}
+              aria-pressed={active}
+            >
+              <div className="aspect-[4/3] overflow-hidden bg-black/30">
+                {previewPhoto ? (
+                  <img
+                    src={previewPhoto}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    style={{ filter: filter.cssFilter }}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : null}
+              </div>
+              <div className="flex items-center justify-between gap-2 p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-amoura-cream">
+                    {filter.name}
+                  </p>
+                  <p className="truncate text-[11px] text-amoura-muted">
+                    {filter.subtitle}
+                  </p>
+                </div>
+                {active ? (
+                  <Check className="h-4 w-4 shrink-0 text-amoura-red-soft" aria-hidden="true" />
+                ) : null}
+              </div>
+            </button>
+          )
+        })}
+      </HorizontalRail>
+    </div>
+  )
+}
+
+function CaptionStep({
+  state,
+  onChange,
+}: {
+  state: EditorState
+  onChange: (patch: Partial<EditorState>) => void
+}) {
+  const kind = getDesignById(state.selectedDesignId).kind
+  const placeholder =
+    kind === "card" ? "For example: Ken and Faye" : "My favorite memory ♥"
+
+  return (
+    <div className="pb-1">
+      <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+        <label
+          htmlFor="amore-caption"
+          className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted"
+        >
+          {kind === "card" ? "Card name" : "Caption"}
+        </label>
+        <textarea
+          id="amore-caption"
+          value={state.caption}
+          onChange={(event) =>
+            onChange({ caption: event.target.value.slice(0, MAX_CAPTION) })
+          }
+          maxLength={MAX_CAPTION}
+          rows={3}
+          placeholder={placeholder}
+          className="mt-2 w-full resize-none rounded-2xl border border-amoura-red-soft/15 bg-black/35 px-4 py-3 text-base text-amoura-cream outline-none transition placeholder:text-amoura-muted focus:border-amoura-red-soft/45 focus:ring-2 focus:ring-amoura-red-soft/20"
+        />
+        <p className="mt-2 text-right text-xs text-amoura-muted">
+          {state.caption.length}/{MAX_CAPTION}
+        </p>
+      </div>
+
+      <div className="mt-3 rounded-2xl border border-white/8 bg-black/20 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
+          Position
+        </p>
+        <OptionPills
+          value={state.captionPosition}
+          options={[
+            { id: "top", label: "Top" },
+            { id: "bottom", label: "Bottom" },
+            { id: "hidden", label: "Hidden" },
+          ]}
+          onChange={(value) =>
+            onChange({ captionPosition: value as CaptionPosition })
+          }
+          columns={3}
+        />
+      </div>
+    </div>
+  )
+}
+
+function DetailsStep({
+  state,
+  dateStampText,
+  filmNumberText,
+  onChange,
+}: {
+  state: EditorState
+  dateStampText: string
+  filmNumberText: string
+  onChange: (patch: Partial<EditorState>) => void
+}) {
+  return (
+    <div className="space-y-3 pb-1">
+      <section className="rounded-2xl border border-white/8 bg-black/20 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
+          Date stamp
+        </p>
+        <OptionPills
+          value={state.dateStampMode}
+          options={[
+            { id: "none", label: "None" },
+            { id: "date", label: "Date" },
+            { id: "date-time", label: "Date + time" },
+            { id: "date-time-brand", label: "+ AmoreFrame" },
+          ]}
+          onChange={(value) =>
+            onChange({ dateStampMode: value as DateStampMode })
+          }
+          columns={2}
+        />
+        {dateStampText ? (
+          <p className="mt-3 rounded-xl border border-white/8 bg-black/25 px-3 py-2 text-xs text-amoura-muted">
+            {dateStampText}
+          </p>
+        ) : null}
+      </section>
+
+      <section className="rounded-2xl border border-white/8 bg-black/20 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
+          Film metadata
+        </p>
+        <OptionPills
+          value={state.filmNumberMode}
+          options={[
+            { id: "none", label: "None" },
+            { id: "frame", label: "FRAME 024" },
+            { id: "roll", label: "ROLL 03" },
+            { id: "serial", label: "AF serial" },
+          ]}
+          onChange={(value) =>
+            onChange({ filmNumberMode: value as FilmNumberMode })
+          }
+          columns={2}
+        />
+        {filmNumberText ? (
+          <p className="mt-3 rounded-xl border border-white/8 bg-black/25 px-3 py-2 font-mono text-xs text-amoura-muted">
+            {filmNumberText}
+          </p>
+        ) : null}
+      </section>
+    </div>
+  )
+}
+
+function OptionPills({
+  value,
+  options,
+  onChange,
+  columns,
+}: {
+  value: string
+  options: { id: string; label: string }[]
+  onChange: (value: string) => void
+  columns: 2 | 3
+}) {
+  return (
+    <div
+      className={`mt-3 grid gap-2 ${
+        columns === 3 ? "grid-cols-3" : "grid-cols-2"
+      }`}
+    >
+      {options.map((option) => {
+        const active = option.id === value
 
         return (
           <button
-            key={filter.id}
+            key={option.id}
             type="button"
-            onClick={() => setSelectedFilterId(filter.id)}
-            aria-pressed={active}
-            className={`overflow-hidden rounded-2xl border text-left outline-none transition active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
+            onClick={() => onChange(option.id)}
+            className={`min-h-11 rounded-xl border px-2.5 py-2 text-xs font-semibold leading-4 outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
               active
-                ? "border-amoura-red-soft bg-amoura-red/10"
-                : "border-white/8 bg-black/20 hover:border-white/20"
+                ? "border-amoura-red-soft bg-amoura-red/15 text-amoura-cream"
+                : "border-white/8 bg-black/20 text-amoura-muted hover:border-white/20 hover:text-amoura-cream"
             }`}
+            aria-pressed={active}
           >
-            <div className="aspect-[4/3] overflow-hidden bg-black/30">
-              {previewPhoto ? (
-                <img
-                  src={previewPhoto}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  style={{ filter: filter.cssFilter }}
-                />
-              ) : null}
-            </div>
-            <div className="flex items-center justify-between gap-2 p-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-amoura-cream">
-                  {filter.name}
-                </p>
-                <p className="truncate text-[11px] text-amoura-muted">
-                  {filter.subtitle}
-                </p>
-              </div>
-              {active ? (
-                <Check className="h-4 w-4 shrink-0 text-amoura-red-soft" aria-hidden="true" />
-              ) : null}
-            </div>
+            {option.label}
           </button>
         )
       })}
@@ -2470,286 +2421,73 @@ function FilterStep({
   )
 }
 
-function CaptionStep({
-  kind,
-  caption,
-  setCaption,
-  captionPosition,
-  setCaptionPosition,
-  dateStampMode,
-  setDateStampMode,
-  dateStyle,
-  setDateStyle,
-  filmNumberMode,
-  setFilmNumberMode,
-  dateStampText,
-  filmNumberText,
-}: {
-  kind: "strip" | "card"
-  caption: string
-  setCaption: (value: string) => void
-  captionPosition: CaptionPosition
-  setCaptionPosition: (position: CaptionPosition) => void
-  dateStampMode: DateStampMode
-  setDateStampMode: (mode: DateStampMode) => void
-  dateStyle: DateStyle
-  setDateStyle: (style: DateStyle) => void
-  filmNumberMode: FilmNumberMode
-  setFilmNumberMode: (mode: FilmNumberMode) => void
-  dateStampText: string
-  filmNumberText: string
-}) {
-  const placeholder =
-    kind === "card" ? "For example: Ken and Faye" : "My favorite memory ♥"
-
-  return (
-    <div className="space-y-4 pb-2">
-      <fieldset className="rounded-2xl border border-white/8 bg-black/20 p-4">
-        <legend className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
-          {kind === "card" ? "Card name" : "Caption"}
-        </legend>
-        <textarea
-          value={caption}
-          onChange={(event) =>
-            setCaption(event.target.value.slice(0, MAX_CAPTION))
-          }
-          maxLength={MAX_CAPTION}
-          rows={3}
-          placeholder={placeholder}
-          className="mt-2 w-full resize-none rounded-2xl border border-amoura-red-soft/15 bg-black/35 px-4 py-3 text-base text-amoura-cream outline-none transition placeholder:text-amoura-muted focus:border-amoura-red-soft/45 focus:ring-2 focus:ring-amoura-red-soft/20"
-          aria-describedby="caption-count"
-        />
-        <div
-          id="caption-count"
-          className="mt-2 text-right text-xs text-amoura-muted"
-        >
-          {caption.length}/{MAX_CAPTION}
-        </div>
-
-        <OptionGroup
-          label="Caption position"
-          options={[
-            { id: "top", label: "Top" },
-            { id: "bottom", label: "Bottom" },
-            { id: "hidden", label: "Hidden" },
-          ]}
-          value={captionPosition}
-          onChange={(value) => setCaptionPosition(value as CaptionPosition)}
-          columns={3}
-        />
-      </fieldset>
-
-      <fieldset className="rounded-2xl border border-white/8 bg-black/20 p-4">
-        <legend className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
-          Date stamp
-        </legend>
-        <OptionGroup
-          label="Date stamp style"
-          hideLabel
-          options={[
-            { id: "none", label: "None" },
-            { id: "date", label: "Date" },
-            { id: "date-time", label: "Date + time" },
-            {
-              id: "date-time-brand",
-              label: "Date + time + AmoreFrame",
-            },
-          ]}
-          value={dateStampMode}
-          onChange={(value) => setDateStampMode(value as DateStampMode)}
-          columns={2}
-        />
-
-        {dateStampMode !== "none" ? (
-          <div className="mt-3 border-t border-white/8 pt-3">
-            <OptionGroup
-              label="Date format"
-              options={[
-                { id: "long", label: "July 25, 2026" },
-                { id: "numeric", label: "07.25.2026" },
-              ]}
-              value={dateStyle}
-              onChange={(value) => setDateStyle(value as DateStyle)}
-              columns={2}
-            />
-            <p className="mt-3 rounded-xl border border-white/8 bg-black/25 px-3 py-2 text-xs text-amoura-muted">
-              Preview: {dateStampText}
-            </p>
-          </div>
-        ) : null}
-      </fieldset>
-
-      <fieldset className="rounded-2xl border border-white/8 bg-black/20 p-4">
-        <legend className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-amoura-muted">
-          Film number
-        </legend>
-        <OptionGroup
-          label="Film metadata"
-          hideLabel
-          options={[
-            { id: "none", label: "None" },
-            { id: "frame", label: "FRAME 024" },
-            { id: "roll", label: "ROLL 03" },
-            { id: "serial", label: "AF-2026-000145" },
-          ]}
-          value={filmNumberMode}
-          onChange={(value) => setFilmNumberMode(value as FilmNumberMode)}
-          columns={2}
-        />
-        {filmNumberText ? (
-          <p className="mt-3 rounded-xl border border-white/8 bg-black/25 px-3 py-2 text-xs text-amoura-muted">
-            Your frame: {filmNumberText}
-          </p>
-        ) : null}
-      </fieldset>
-    </div>
-  )
-}
-
-function OptionGroup({
-  label,
-  hideLabel = false,
-  options,
-  value,
-  onChange,
-  columns,
-}: {
-  label: string
-  hideLabel?: boolean
-  options: { id: string; label: string }[]
-  value: string
-  onChange: (value: string) => void
-  columns: 2 | 3
-}) {
-  return (
-    <div className="mt-3">
-      <p
-        className={
-          hideLabel
-            ? "sr-only"
-            : "mb-2 text-xs font-semibold text-amoura-muted"
-        }
-      >
-        {label}
-      </p>
-      <div
-        className={`grid gap-2 ${columns === 3 ? "grid-cols-3" : "grid-cols-2"}`}
-      >
-        {options.map((option) => {
-          const active = value === option.id
-
-          return (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onChange(option.id)}
-              aria-pressed={active}
-              className={`min-h-11 rounded-xl border px-2.5 py-2 text-xs font-semibold leading-4 outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft ${
-                active
-                  ? "border-amoura-red-soft bg-amoura-red/15 text-amoura-cream"
-                  : "border-white/8 bg-black/20 text-amoura-muted hover:border-white/20 hover:text-amoura-cream"
-              }`}
-            >
-              {option.label}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function DownloadStep({
-  selectedDesign,
-  photo,
+  state,
   photos,
-  filter,
-  caption,
-  captionPosition,
+  selectedDesign,
+  selectedFilter,
   dateStampText,
   filmNumberText,
-  stickers,
-  onRemoveSticker,
-  onDownload,
   isDownloading,
+  onDownload,
+  onApply,
   onRetake,
-  onClose,
 }: {
-  selectedDesign: DesignOption
-  photo?: string
+  state: EditorState
   photos: string[]
-  filter: FilterOption
-  caption: string
-  captionPosition: CaptionPosition
+  selectedDesign: DesignOption
+  selectedFilter: FilterOption
   dateStampText: string
   filmNumberText: string
-  stickers: StickerMap
-  onRemoveSticker: (slot: StickerSlot) => void
-  onDownload: () => void
   isDownloading: boolean
+  onDownload: () => Promise<void>
+  onApply: () => void
   onRetake: () => void
-  onClose: () => void
 }) {
   return (
-    <div className="pb-3 text-center">
-      <div className="relative mx-auto mb-3 flex h-14 w-14 items-center justify-center sm:h-16 sm:w-16">
-        <span className="absolute inset-0 animate-ping rounded-full bg-amoura-red-soft/25" />
-        <div className="relative flex h-14 w-14 items-center justify-center rounded-full border border-amoura-red-soft/30 bg-amoura-red/15 sm:h-16 sm:w-16">
-          <PartyPopper className="h-6 w-6 text-amoura-red-soft sm:h-7 sm:w-7" aria-hidden="true" />
-        </div>
+    <div className="pb-2 text-center">
+      <div className="relative mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-amoura-red-soft/30 bg-amoura-red/15">
+        <PartyPopper className="h-5 w-5 text-amoura-red-soft" aria-hidden="true" />
       </div>
-
-      <h3 className="amoura-serif text-2xl text-amoura-cream sm:text-3xl">
+      <h3 className="amoura-serif text-2xl text-amoura-cream">
         Your memory is ready
       </h3>
-      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-amoura-muted">
-        Review the final frame, then save it directly to your device.
+      <p className="mx-auto mt-1.5 max-w-sm text-sm leading-5 text-amoura-muted">
+        Review the draft, save it, or apply it to the main preview.
       </p>
 
-      <div className="animate-preview-swap relative mx-auto mt-4 flex h-[48svh] min-h-[360px] max-h-[560px] items-center justify-center rounded-2xl border border-white/5 bg-black/20 p-3 sm:h-[54vh]">
+      <div className="mx-auto mt-3 flex h-52 items-center justify-center rounded-2xl border border-white/6 bg-black/20 p-2.5 sm:h-60">
         {selectedDesign.kind === "strip" ? (
           <StripPreview
             photos={photos}
             design={selectedDesign}
-            filter={filter}
-            caption={caption}
-            captionPosition={captionPosition}
+            filter={selectedFilter}
+            caption={state.caption}
+            captionPosition={state.captionPosition}
             dateStampText={dateStampText}
             filmNumberText={filmNumberText}
-            stickers={stickers}
-            onRemoveSticker={onRemoveSticker}
+            stickers={state.stickers}
           />
         ) : (
           <CardPreview
-            photo={photo}
+            photo={photos[state.selectedPhotoIndex] ?? photos[0]}
             design={selectedDesign}
-            filter={filter}
-            caption={caption}
-            captionPosition={captionPosition}
+            filter={selectedFilter}
+            caption={state.caption}
+            captionPosition={state.captionPosition}
             dateStampText={dateStampText}
             filmNumberText={filmNumberText}
-            stickers={stickers}
-            onRemoveSticker={onRemoveSticker}
+            stickers={state.stickers}
           />
         )}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] px-4 py-3 text-left">
-        <p className="text-xs font-semibold text-emerald-100">
-          Saved locally, never uploaded
-        </p>
-        <p className="mt-1 text-xs leading-5 text-emerald-100/65">
-          The final image is rendered inside your browser and downloaded to
-          your device.
-        </p>
-      </div>
-
-      <div className="mt-4 grid gap-2.5">
+      <div className="mt-3 grid gap-2.5">
         <button
           type="button"
-          onClick={onDownload}
+          onClick={() => void onDownload()}
           disabled={isDownloading}
-          className="amoura-btn-primary inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold outline-none disabled:cursor-not-allowed disabled:opacity-70 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+          className="amoura-btn-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold outline-none disabled:opacity-65 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
         >
           {isDownloading ? (
             <>
@@ -2768,23 +2506,31 @@ function DownloadStep({
           <button
             type="button"
             onClick={onRetake}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-4 text-sm font-semibold text-amoura-cream outline-none transition hover:border-amoura-red-soft/45 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-4 text-sm font-semibold text-amoura-cream outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
           >
             <RefreshCcw className="h-4 w-4" aria-hidden="true" />
             Retake
           </button>
           <button
             type="button"
-            onClick={onClose}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-amoura-red-soft/20 bg-black/35 px-4 text-sm font-semibold text-amoura-cream outline-none transition hover:border-amoura-red-soft/45 focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+            onClick={onApply}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-amoura-red-soft/35 bg-amoura-red/12 px-4 text-sm font-semibold text-amoura-cream outline-none transition focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
           >
             <Check className="h-4 w-4" aria-hidden="true" />
-            Done
+            Apply and close
           </button>
         </div>
       </div>
     </div>
   )
+}
+
+function tabClass(active: boolean) {
+  return `inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2.5 text-xs font-semibold outline-none transition sm:text-sm ${
+    active
+      ? "bg-amoura-red-soft text-black shadow-[0_8px_24px_rgba(194,31,58,0.22)]"
+      : "text-amoura-muted hover:text-amoura-cream focus-visible:ring-2 focus-visible:ring-amoura-red-soft"
+  }`
 }
 
 function StickerOverlay({
@@ -2813,11 +2559,23 @@ function StickerOverlay({
         const emoji = stickers[slot]
         if (!emoji) return null
 
+        if (!onRemove) {
+          return (
+            <span
+              key={slot}
+              className={`pointer-events-none absolute z-30 flex h-8 w-8 items-center justify-center text-base leading-none sm:h-10 sm:w-10 sm:text-xl ${className}`}
+              aria-hidden="true"
+            >
+              {emoji}
+            </span>
+          )
+        }
+
         return (
           <button
             key={slot}
             type="button"
-            onClick={() => onRemove?.(slot)}
+            onClick={() => onRemove(slot)}
             className={`absolute z-30 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/35 text-base leading-none backdrop-blur-sm outline-none transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-white sm:h-10 sm:w-10 sm:text-xl ${className}`}
             aria-label={`Remove ${emoji} sticker`}
           >
@@ -2855,12 +2613,14 @@ const StripPreview = memo(function StripPreview({
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden">
       <div
-        className={`relative flex h-[96%] max-h-[96%] w-auto max-w-full flex-col overflow-hidden rounded-[1.45rem] border p-2.5 shadow-2xl sm:p-3 ${design.backgroundClass} ${design.outerBorderClass}`}
+        className={`relative flex h-[96%] max-h-[96%] w-auto max-w-full flex-col overflow-hidden rounded-[1.4rem] border p-2.5 shadow-2xl transition-all duration-200 sm:p-3 ${design.backgroundClass} ${design.outerBorderClass}`}
         style={{ aspectRatio: `${STRIP_WIDTH} / ${STRIP_HEIGHT}` }}
       >
         <StripDecorations design={design} />
         <StickerOverlay stickers={stickers} onRemove={onRemoveSticker} />
-        {design.badge ? <EditionBadge badge={design.badge} /> : null}
+        {DESIGN_BADGES[design.id] ? (
+          <EditionBadge badge={DESIGN_BADGES[design.id]!} />
+        ) : null}
 
         <div className="relative z-10 shrink-0 text-center">
           <p
@@ -2889,10 +2649,8 @@ const StripPreview = memo(function StripPreview({
                 src={photo}
                 alt={`Captured shot ${index + 1}`}
                 className="h-full w-full object-cover"
-                style={{
-                  filter: filter.cssFilter,
-                  transition: "filter 240ms ease",
-                }}
+                style={{ filter: filter.cssFilter, transition: "filter 180ms ease" }}
+                decoding="async"
               />
             </div>
           ))}
@@ -2906,23 +2664,12 @@ const StripPreview = memo(function StripPreview({
           className={`relative z-10 mt-1.5 shrink-0 text-center sm:mt-2 ${design.titleClass}`}
         >
           <p className="text-sm leading-none sm:text-base">{design.accent}</p>
-          {dateStampText || filmNumberText ? (
-            <div className="mt-1 space-y-0.5">
-              {dateStampText ? (
-                <p
-                  className={`line-clamp-2 text-[0.34rem] uppercase tracking-[0.08em] sm:text-[0.42rem] ${design.subtitleClass}`}
-                >
-                  {dateStampText}
-                </p>
-              ) : null}
-              {filmNumberText ? (
-                <p
-                  className={`text-[0.34rem] font-bold uppercase tracking-[0.14em] sm:text-[0.42rem] ${design.subtitleClass}`}
-                >
-                  {filmNumberText}
-                </p>
-              ) : null}
-            </div>
+          {dateStampText ? (
+            <p
+              className={`mt-1 line-clamp-2 text-[0.33rem] uppercase tracking-[0.07em] sm:text-[0.41rem] ${design.subtitleClass}`}
+            >
+              {dateStampText}
+            </p>
           ) : (
             <p
               className={`mt-0.5 text-[0.34rem] uppercase tracking-[0.14em] sm:text-[0.42rem] ${design.subtitleClass}`}
@@ -2930,6 +2677,13 @@ const StripPreview = memo(function StripPreview({
               Captured with love
             </p>
           )}
+          {filmNumberText ? (
+            <p
+              className={`mt-0.5 font-mono text-[0.33rem] uppercase tracking-[0.12em] sm:text-[0.4rem] ${design.subtitleClass}`}
+            >
+              {filmNumberText}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
@@ -2981,29 +2735,32 @@ const CardPreview = memo(function CardPreview({
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden">
       <div
-        className={`relative flex h-[96%] max-h-[96%] w-auto max-w-full flex-col overflow-hidden rounded-[1.6rem] border-[3px] p-3 shadow-2xl sm:p-4 ${design.backgroundClass} ${design.outerBorderClass}`}
+        className={`relative flex h-[96%] max-h-[96%] w-auto max-w-full flex-col overflow-hidden rounded-[1.55rem] border-[3px] p-3 shadow-2xl transition-all duration-200 sm:p-4 ${design.backgroundClass} ${design.outerBorderClass}`}
         style={{ aspectRatio: `${CARD_WIDTH} / ${CARD_HEIGHT}` }}
       >
         <div
           aria-hidden="true"
-          className="animate-holo-shift pointer-events-none absolute inset-0 z-0 opacity-[0.2] mix-blend-overlay"
+          className="pointer-events-none absolute inset-0 z-0 opacity-[0.18] mix-blend-overlay"
           style={{
-            backgroundImage: `linear-gradient(135deg, ${design.holoGradient.join(", ")})`,
+            backgroundImage: `linear-gradient(135deg, ${design.holoGradient.join(
+              ", "
+            )})`,
           }}
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-[7px] z-[1] rounded-[1.25rem] border border-white/25"
+          className="pointer-events-none absolute inset-[7px] z-[1] rounded-[1.2rem] border border-white/25"
         />
 
         <StickerOverlay stickers={stickers} onRemove={onRemoveSticker} />
-        {design.badge ? <EditionBadge badge={design.badge} /> : null}
+        {DESIGN_BADGES[design.id] ? (
+          <EditionBadge badge={DESIGN_BADGES[design.id]!} />
+        ) : null}
 
         <div className="relative z-10 flex items-center justify-between gap-2">
           <span
-            className={`inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/20 px-2.5 py-1 text-[0.5rem] font-bold uppercase tracking-wide backdrop-blur-sm sm:text-[0.6rem] ${design.subtitleClass}`}
+            className={`rounded-full border border-white/20 bg-white/20 px-2.5 py-1 text-[0.5rem] font-bold uppercase tracking-wide backdrop-blur-sm sm:text-[0.6rem] ${design.subtitleClass}`}
           >
-            <span aria-hidden="true">{design.typeIcon}</span>
             {design.typeLabel}
           </span>
           <span className={`text-sm font-bold sm:text-base ${design.titleClass}`}>
@@ -3026,10 +2783,8 @@ const CardPreview = memo(function CardPreview({
               src={photo}
               alt="Selected card shot"
               className="h-full w-full object-cover"
-              style={{
-                filter: filter.cssFilter,
-                transition: "filter 240ms ease",
-              }}
+              style={{ filter: filter.cssFilter, transition: "filter 180ms ease" }}
+              decoding="async"
             />
           ) : null}
 
@@ -3044,8 +2799,10 @@ const CardPreview = memo(function CardPreview({
 
         <div className="relative z-10 mt-1.5 shrink-0 rounded-xl border border-white/10 bg-black/15 px-2.5 py-2 backdrop-blur-sm sm:mt-2 sm:px-3">
           <div className="flex items-center justify-between gap-2">
-            <p className={`truncate text-[0.58rem] font-bold sm:text-xs ${design.titleClass}`}>
-              {design.typeIcon} {design.moveName}
+            <p
+              className={`truncate text-[0.58rem] font-bold sm:text-xs ${design.titleClass}`}
+            >
+              {design.moveName}
             </p>
             <p className={`text-[0.58rem] font-bold sm:text-xs ${design.titleClass}`}>
               {design.moveDamage}
@@ -3064,13 +2821,13 @@ const CardPreview = memo(function CardPreview({
           </p>
           {dateStampText ? (
             <p
-              className={`mt-1 line-clamp-1 text-[0.34rem] uppercase tracking-[0.08em] sm:text-[0.42rem] ${design.subtitleClass}`}
+              className={`mt-1 line-clamp-1 text-[0.33rem] uppercase tracking-[0.07em] sm:text-[0.41rem] ${design.subtitleClass}`}
             >
               {dateStampText}
             </p>
           ) : null}
           <p
-            className={`mt-0.5 text-[0.32rem] uppercase tracking-[0.12em] sm:text-[0.4rem] ${design.subtitleClass}`}
+            className={`mt-0.5 font-mono text-[0.31rem] uppercase tracking-[0.1em] sm:text-[0.39rem] ${design.subtitleClass}`}
           >
             {filmNumberText || "AmoreFrame original"}
           </p>
@@ -3082,13 +2839,13 @@ const CardPreview = memo(function CardPreview({
 
 function EditionBadge({ badge }: { badge: DesignBadge }) {
   return (
-    <span className="absolute left-1/2 top-1 z-20 -translate-x-1/2 rounded-full border border-white/20 bg-black/55 px-2 py-0.5 text-[0.32rem] font-bold uppercase tracking-[0.14em] text-white backdrop-blur-sm sm:top-1.5 sm:text-[0.38rem]">
+    <span className="absolute left-1/2 top-1 z-20 -translate-x-1/2 rounded-full border border-white/20 bg-black/60 px-2 py-0.5 text-[0.31rem] font-bold uppercase tracking-[0.13em] text-white backdrop-blur-sm sm:top-1.5 sm:text-[0.38rem]">
       {badge}
     </span>
   )
 }
 
-function StripPoster({
+const StripPoster = memo(function StripPoster({
   design,
   photo,
   filter,
@@ -3101,18 +2858,18 @@ function StripPoster({
 }) {
   return (
     <div
-      className={`relative mx-auto aspect-[9/22] w-full max-w-[150px] overflow-hidden rounded-[1.1rem] border p-2.5 transition ${design.backgroundClass} ${
-        active
-          ? "border-amoura-red-soft shadow-[0_0_35px_rgba(194,31,58,0.2)]"
-          : design.outerBorderClass
+      className={`relative mx-auto aspect-[9/22] w-full max-w-[145px] overflow-hidden rounded-[1rem] border p-2 transition ${design.backgroundClass} ${
+        active ? "border-amoura-red-soft" : design.outerBorderClass
       }`}
     >
       <StripDecorations design={design} small />
-      {design.badge ? <EditionBadge badge={design.badge} /> : null}
+      {DESIGN_BADGES[design.id] ? (
+        <EditionBadge badge={DESIGN_BADGES[design.id]!} />
+      ) : null}
 
       {active ? (
-        <div className="absolute right-2 top-2 z-30 rounded-full border border-amoura-red-soft/40 bg-black/45 p-1 text-amoura-red-soft backdrop-blur">
-          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+        <div className="absolute right-2 top-2 z-30 rounded-full bg-amoura-red-soft p-1 text-black">
+          <Check className="h-3 w-3" aria-hidden="true" />
         </div>
       ) : null}
 
@@ -3122,7 +2879,7 @@ function StripPoster({
         </p>
       </div>
 
-      <div className="relative z-10 mt-2 grid gap-1.5">
+      <div className="relative z-10 mt-1.5 grid gap-1.5">
         {[0, 1, 2].map((index) => (
           <div
             key={index}
@@ -3134,6 +2891,8 @@ function StripPoster({
                 alt=""
                 className="aspect-[4/3] w-full object-cover"
                 style={{ filter: filter.cssFilter }}
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               <div className="aspect-[4/3] w-full bg-black/10" />
@@ -3147,9 +2906,9 @@ function StripPoster({
       </div>
     </div>
   )
-}
+})
 
-function CardPoster({
+const CardPoster = memo(function CardPoster({
   design,
   photo,
   filter,
@@ -3162,31 +2921,33 @@ function CardPoster({
 }) {
   return (
     <div
-      className={`relative mx-auto w-full max-w-[150px] overflow-hidden rounded-[1.1rem] border-[2.5px] p-2.5 transition ${design.backgroundClass} ${
-        active
-          ? "border-amoura-red-soft shadow-[0_0_35px_rgba(194,31,58,0.2)]"
-          : design.outerBorderClass
+      className={`relative mx-auto w-full max-w-[145px] overflow-hidden rounded-[1rem] border-[2.5px] p-2 transition ${design.backgroundClass} ${
+        active ? "border-amoura-red-soft" : design.outerBorderClass
       }`}
       style={{ aspectRatio: `${CARD_WIDTH} / ${CARD_HEIGHT}` }}
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 opacity-[0.18] mix-blend-overlay"
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.16] mix-blend-overlay"
         style={{
-          backgroundImage: `linear-gradient(135deg, ${design.holoGradient.join(", ")})`,
+          backgroundImage: `linear-gradient(135deg, ${design.holoGradient.join(
+            ", "
+          )})`,
         }}
       />
-      {design.badge ? <EditionBadge badge={design.badge} /> : null}
+      {DESIGN_BADGES[design.id] ? (
+        <EditionBadge badge={DESIGN_BADGES[design.id]!} />
+      ) : null}
 
       {active ? (
-        <div className="absolute right-2 top-2 z-30 rounded-full border border-amoura-red-soft/40 bg-black/45 p-1 text-amoura-red-soft backdrop-blur">
-          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+        <div className="absolute right-2 top-2 z-30 rounded-full bg-amoura-red-soft p-1 text-black">
+          <Check className="h-3 w-3" aria-hidden="true" />
         </div>
       ) : null}
 
       <div className="relative z-10 flex items-center justify-between pt-1">
         <span className={`text-[7px] font-bold uppercase ${design.subtitleClass}`}>
-          {design.typeIcon} {design.typeLabel}
+          {design.typeLabel}
         </span>
         <span className={`text-[8px] font-bold ${design.titleClass}`}>
           {design.hp} HP
@@ -3206,6 +2967,8 @@ function CardPoster({
             alt=""
             className="aspect-[4/5] w-full object-cover"
             style={{ filter: filter.cssFilter }}
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="aspect-[4/5] w-full bg-black/10" />
@@ -3219,7 +2982,7 @@ function CardPoster({
       </div>
     </div>
   )
-}
+})
 
 function StripDecorations({
   design,
@@ -3229,9 +2992,8 @@ function StripDecorations({
   small?: boolean
 }) {
   const size = small ? "text-[9px]" : "text-xs sm:text-sm"
-  const decoration = design.canvas.decoration
 
-  if (decoration === "vintage") {
+  if (design.canvas.decoration === "vintage") {
     return (
       <div className="pointer-events-none absolute inset-0 opacity-35">
         <div className="absolute left-2 top-0 h-full w-2.5 bg-[repeating-linear-gradient(to_bottom,#451a03_0px,#451a03_8px,transparent_8px,transparent_17px)] sm:w-3" />
@@ -3240,45 +3002,18 @@ function StripDecorations({
     )
   }
 
-  if (decoration === "pixel") {
-    return (
-      <div className="pointer-events-none absolute inset-0 opacity-25">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.35)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.35)_1px,transparent_1px)] bg-[size:16px_16px]" />
-      </div>
-    )
-  }
-
-  if (decoration === "arcade") {
-    return (
-      <div className={`pointer-events-none absolute inset-0 opacity-80 ${size}`}>
-        <span className="absolute left-3 top-3">▲</span>
-        <span className="absolute right-3 top-5">●</span>
-        <span className="absolute bottom-4 left-3">◆</span>
-        <span className="absolute bottom-3 right-3">■</span>
-      </div>
-    )
-  }
-
-  const cornerSets: Partial<Record<StripDecoration, [string, string, string, string]>> = {
+  const cornerSets: Partial<
+    Record<StripDesign["canvas"]["decoration"], [string, string, string, string]>
+  > = {
     barkada: ["🌼", "😊", "✿", "🌈"],
     romance: ["♥", "♥", "♡", "♡"],
     kawaii: ["🎀", "♡", "☁", "✿"],
     midnight: ["✦", "☾", "✧", "✦"],
     noir: ["✦", "☾", "✧", "✦"],
     retro: ["★", "●", "◆", "★"],
-    sakura: ["🌸", "✿", "❀", "🌸"],
-    festival: ["🏮", "✦", "✧", "🏮"],
-    moonlight: ["☾", "✦", "✧", "★"],
-    ocean: ["≈", "◌", "◦", "≈"],
-    sky: ["☁", "✧", "☆", "☁"],
-    christmas: ["❄", "★", "✦", "❄"],
-    halloween: ["☾", "✦", "◈", "★"],
-    graduation: ["★", "✦", "◆", "★"],
-    summer: ["☀", "≈", "✦", "☀"],
-    valentine: ["♥", "♡", "♥", "♡"],
   }
 
-  const corners = cornerSets[decoration]
+  const corners = cornerSets[design.canvas.decoration]
 
   if (corners) {
     return (
@@ -3340,27 +3075,30 @@ async function drawStrip({
 
   drawCanvasDecorations(ctx, design)
 
-  if (design.badge) {
-    drawCanvasBadge(ctx, design.badge, STRIP_WIDTH / 2, 42)
+  if (DESIGN_BADGES[design.id]) {
+    drawCanvasBadge(ctx, DESIGN_BADGES[design.id]!, STRIP_WIDTH / 2, 38)
   }
 
   ctx.textAlign = "center"
   ctx.fillStyle = design.canvas.text
   ctx.font = "bold 54px Georgia, serif"
-  ctx.fillText(design.brand, STRIP_WIDTH / 2, 88)
+  ctx.fillText(design.brand, STRIP_WIDTH / 2, 82)
 
   ctx.fillStyle = design.canvas.mutedText
   ctx.font = "bold 18px Arial, sans-serif"
-  ctx.fillText(design.name.toUpperCase(), STRIP_WIDTH / 2, 120)
+  ctx.fillText(design.name.toUpperCase(), STRIP_WIDTH / 2, 114)
 
   const showCaption = caption.trim().length > 0 && captionPosition !== "hidden"
   const hasTopCaption = showCaption && captionPosition === "top"
   const hasBottomCaption = showCaption && captionPosition === "bottom"
-  const topY = hasTopCaption ? 208 : 154
-  const footerStart = STRIP_HEIGHT - 170
-  const bottomCaptionSpace = hasBottomCaption ? 76 : 0
+  const topY = hasTopCaption ? 186 : TOP_PADDING + 28
+  const footerStart = STRIP_HEIGHT - 160
+  const bottomCaptionSpace = hasBottomCaption ? 72 : 0
   const availablePhotoHeight =
-    footerStart - bottomCaptionSpace - topY - STRIP_GAP * (photos.length - 1)
+    footerStart -
+    bottomCaptionSpace -
+    topY -
+    GAP * Math.max(photos.length - 1, 0)
   const photoHeight = Math.min(
     PHOTO_HEIGHT,
     Math.floor(availablePhotoHeight / Math.max(photos.length, 1))
@@ -3371,9 +3109,9 @@ async function drawStrip({
       ctx,
       caption,
       120,
-      138,
+      126,
       STRIP_WIDTH - 240,
-      52,
+      48,
       design.canvas.text,
       design.canvas.border
     )
@@ -3403,7 +3141,7 @@ async function drawStrip({
       filter.canvasFilter
     )
 
-    y += photoHeight + STRIP_GAP
+    y += photoHeight + GAP
   }
 
   if (hasBottomCaption) {
@@ -3411,40 +3149,37 @@ async function drawStrip({
       ctx,
       caption,
       120,
-      y - 2,
+      y - 4,
       STRIP_WIDTH - 240,
-      54,
+      50,
       design.canvas.text,
       design.canvas.border
     )
   }
 
   ctx.fillStyle = design.canvas.accent
-  ctx.font = "bold 42px Georgia, serif"
-  ctx.fillText(design.accent, STRIP_WIDTH / 2, STRIP_HEIGHT - 118)
+  ctx.font = "bold 40px Georgia, serif"
+  ctx.fillText(design.accent, STRIP_WIDTH / 2, STRIP_HEIGHT - 112)
 
+  ctx.fillStyle = design.canvas.mutedText
+  ctx.font = "bold 15px Arial, sans-serif"
   if (dateStampText) {
-    ctx.fillStyle = design.canvas.mutedText
-    ctx.font = "bold 15px Arial, sans-serif"
     drawCenteredWrappedText(
       ctx,
       dateStampText.toUpperCase(),
       STRIP_WIDTH / 2,
-      STRIP_HEIGHT - 84,
+      STRIP_HEIGHT - 82,
       STRIP_WIDTH - 220,
-      21,
+      20,
       2
     )
   } else {
-    ctx.fillStyle = design.canvas.mutedText
-    ctx.font = "bold 15px Arial, sans-serif"
-    ctx.fillText("CAPTURED WITH LOVE", STRIP_WIDTH / 2, STRIP_HEIGHT - 82)
+    ctx.fillText("CAPTURED WITH LOVE", STRIP_WIDTH / 2, STRIP_HEIGHT - 80)
   }
 
   if (filmNumberText) {
-    ctx.fillStyle = design.canvas.mutedText
     ctx.font = "bold 14px monospace"
-    ctx.fillText(filmNumberText, STRIP_WIDTH / 2, STRIP_HEIGHT - 42)
+    ctx.fillText(filmNumberText, STRIP_WIDTH / 2, STRIP_HEIGHT - 40)
   }
 
   drawStickers(ctx, stickers, STRIP_WIDTH, STRIP_HEIGHT, 46, 64)
@@ -3509,14 +3244,14 @@ async function drawCard({
     2
   )
 
-  if (design.badge) {
-    drawCanvasBadge(ctx, design.badge, CARD_WIDTH / 2, 44)
+  if (DESIGN_BADGES[design.id]) {
+    drawCanvasBadge(ctx, DESIGN_BADGES[design.id]!, CARD_WIDTH / 2, 42)
   }
 
   ctx.textAlign = "left"
   ctx.fillStyle = design.canvas.text
   ctx.font = "bold 24px Arial, sans-serif"
-  ctx.fillText(`${design.typeIcon} ${design.typeLabel.toUpperCase()}`, 64, 92)
+  ctx.fillText(design.typeLabel.toUpperCase(), 64, 92)
 
   ctx.textAlign = "right"
   ctx.fillStyle = design.canvas.accent
@@ -3554,9 +3289,9 @@ async function drawCard({
     drawRoundedRect(
       ctx,
       photoX + 34,
-      photoY + photoH - 88,
+      photoY + photoH - 86,
       photoW - 68,
-      58,
+      56,
       20,
       "#000000"
     )
@@ -3564,7 +3299,7 @@ async function drawCard({
 
     ctx.textAlign = "center"
     ctx.fillStyle = "#ffffff"
-    ctx.font = "bold 24px Arial, sans-serif"
+    ctx.font = "bold 23px Arial, sans-serif"
     ctx.fillText(
       fitCanvasText(ctx, caption, photoW - 120),
       CARD_WIDTH / 2,
@@ -3583,7 +3318,7 @@ async function drawCard({
   ctx.textAlign = "left"
   ctx.fillStyle = design.canvas.text
   ctx.font = "bold 28px Arial, sans-serif"
-  ctx.fillText(`${design.typeIcon} ${design.moveName}`, 88, moveY + 44)
+  ctx.fillText(design.moveName, 88, moveY + 44)
 
   ctx.textAlign = "right"
   ctx.fillStyle = design.canvas.accent
@@ -3703,26 +3438,9 @@ function drawCanvasDecorations(
         design.canvas.text
       )
     }
-  } else if (decoration === "pixel") {
-    ctx.globalAlpha = 0.22
-    ctx.lineWidth = 2
-
-    for (let x = 48; x < STRIP_WIDTH - 48; x += 48) {
-      ctx.beginPath()
-      ctx.moveTo(x, 42)
-      ctx.lineTo(x, STRIP_HEIGHT - 42)
-      ctx.stroke()
-    }
-
-    for (let y = 42; y < STRIP_HEIGHT - 42; y += 48) {
-      ctx.beginPath()
-      ctx.moveTo(48, y)
-      ctx.lineTo(STRIP_WIDTH - 48, y)
-      ctx.stroke()
-    }
   } else {
     const cornerSets: Partial<
-      Record<StripDecoration, [string, string, string, string]>
+      Record<StripDesign["canvas"]["decoration"], [string, string, string, string]>
     > = {
       barkada: ["🌼", "😊", "✿", "🌈"],
       romance: ["♥", "♥", "♡", "♡"],
@@ -3730,17 +3448,6 @@ function drawCanvasDecorations(
       midnight: ["✦", "☾", "✧", "✦"],
       noir: ["✦", "☾", "✧", "✦"],
       retro: ["★", "●", "◆", "★"],
-      arcade: ["▲", "●", "◆", "■"],
-      sakura: ["🌸", "✿", "❀", "🌸"],
-      festival: ["🏮", "✦", "✧", "🏮"],
-      moonlight: ["☾", "✦", "✧", "★"],
-      ocean: ["≈", "◌", "◦", "≈"],
-      sky: ["☁", "✧", "☆", "☁"],
-      christmas: ["❄", "★", "✦", "❄"],
-      halloween: ["☾", "✦", "◈", "★"],
-      graduation: ["★", "✦", "◆", "★"],
-      summer: ["☀", "≈", "✦", "☀"],
-      valentine: ["♥", "♡", "♥", "♡"],
     }
 
     const corners = cornerSets[decoration]
@@ -3771,11 +3478,11 @@ function drawCanvasBadge(
   y: number
 ) {
   const width = badge === "TRENDING" ? 120 : 98
-  const height = 30
+  const height = 28
 
   ctx.save()
   ctx.globalAlpha = 0.72
-  drawRoundedRect(ctx, centerX - width / 2, y - 18, width, height, 15, "#000000")
+  drawRoundedRect(ctx, centerX - width / 2, y - 17, width, height, 14, "#000000")
   ctx.restore()
 
   ctx.save()
@@ -3813,8 +3520,12 @@ function drawCaptionPill(
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
   ctx.fillStyle = textColor
-  ctx.font = "500 23px Arial, sans-serif"
-  ctx.fillText(fitCanvasText(ctx, caption, width - 48), x + width / 2, y + height / 2)
+  ctx.font = "500 22px Arial, sans-serif"
+  ctx.fillText(
+    fitCanvasText(ctx, caption, width - 48),
+    x + width / 2,
+    y + height / 2
+  )
   ctx.restore()
 }
 
@@ -4041,23 +3752,14 @@ function roundedPath(
   ctx.closePath()
 }
 
-function formatDateStamp(
-  date: Date,
-  mode: DateStampMode,
-  style: DateStyle
-) {
+function formatDateStamp(date: Date, mode: DateStampMode) {
   if (mode === "none") return ""
 
-  const formattedDate =
-    style === "numeric"
-      ? `${String(date.getMonth() + 1).padStart(2, "0")}.${String(
-          date.getDate()
-        ).padStart(2, "0")}.${date.getFullYear()}`
-      : new Intl.DateTimeFormat("en-US", {
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-        }).format(date)
+  const formattedDate = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date)
 
   if (mode === "date") return formattedDate
 
@@ -4096,16 +3798,53 @@ function formatFilmNumber(date: Date, mode: FilmNumberMode) {
   )}`
 }
 
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1)
+function getDesignById(id: string) {
+  return ALL_DESIGNS.find((design) => design.id === id) ?? ALL_DESIGNS[0]
+}
+
+function getFilterById(id: string) {
+  return FILTERS.find((filter) => filter.id === id) ?? FILTERS[0]
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob)
+      } else {
+        reject(new Error("Canvas export failed"))
+      }
+    }, "image/png")
+  })
 }
 
 function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
+  const cached = imagePromiseCache.get(src)
+  if (cached) return cached
+
+  const promise = new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
+    let settled = false
+
+    const finish = () => {
+      if (settled) return
+      settled = true
+      resolve(image)
+    }
+
     image.crossOrigin = "anonymous"
-    image.onload = () => resolve(image)
-    image.onerror = reject
+    image.onload = finish
+    image.onerror = () => {
+      imagePromiseCache.delete(src)
+      reject(new Error("Image failed to load"))
+    }
     image.src = src
+
+    if (typeof image.decode === "function") {
+      void image.decode().then(finish).catch(() => undefined)
+    }
   })
+
+  imagePromiseCache.set(src, promise)
+  return promise
 }
