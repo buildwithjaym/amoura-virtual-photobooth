@@ -294,7 +294,7 @@ const STEP_TITLES: Record<WizardStep, string> = {
   caption: "Add the finishing details",
   download: "Your memory is ready",
 }
-
+{/*Strip Designs*/}
 const STRIP_DESIGNS: StripDesign[] = [
   {
     kind: "strip",
