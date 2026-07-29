@@ -117,7 +117,6 @@ const rtcConfig: RTCConfiguration = {
           },
         ]
       : []),
-
   ],
   iceCandidatePoolSize: 10,
 }
