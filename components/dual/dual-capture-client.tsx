@@ -87,6 +87,7 @@ const turnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL
 
 const hasTurnServer = Boolean(turnUsername && turnCredential)
 
+
 const rtcConfig: RTCConfiguration = {
   iceServers: [
     {
@@ -302,7 +303,7 @@ export default function DualCaptureClient({ roomCode }: Props) {
     }
 
     if (room?.current_shot === 3) {
-      return "Final pose. Make it sweet, funny, or romantic."
+      return "Final pose is otw. Make it sweet, funny, or romantic."
     }
 
     return "The host can start when both cameras are ready."
