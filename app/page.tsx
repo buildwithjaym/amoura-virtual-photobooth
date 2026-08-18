@@ -144,59 +144,75 @@ export default function HomePage() {
       <Header open={isNavOpen} setOpen={setIsNavOpen} />
 
       {/* Hero */}
-      <section className="relative overflow-hidden pt-28">
-        <BackgroundGlow />
+<section className="relative overflow-hidden pt-24 lg:pt-28">
+  <BackgroundGlow />
 
-        <div className="amoura-container relative grid min-h-[calc(100vh-7rem)] items-center gap-12 pb-16 lg:grid-cols-[0.96fr_1.04fr] lg:gap-16">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={FADE_UP}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="relative z-10 max-w-3xl"
-          >
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/30 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-amoura-pink shadow-[0_0_45px_rgba(194,31,58,0.15)] sm:text-sm">
-              <Sparkles className="h-4 w-4 shrink-0" />
-              <span>A romantic virtual photobooth for love, dates, and memories</span>
-            </div>
+  <div className="amoura-container relative grid min-h-[calc(100vh-6rem)] items-center gap-10 pb-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-12">
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={FADE_UP}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+      className="relative z-10 max-w-[680px]"
+    >
+      <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amoura-red-soft/30 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-amoura-pink shadow-[0_0_45px_rgba(194,31,58,0.15)] sm:text-sm">
+        <Sparkles className="h-4 w-4 shrink-0" />
 
-            <h1 className="amoura-serif text-5xl leading-[0.92] text-amoura-cream sm:text-6xl md:text-7xl xl:text-8xl">
-              Create romantic photostrips{" "}
-              <span className="amoura-script">together, even from afar.</span>
-            </h1>
+        <span>
+          A romantic virtual photobooth for love, dates, and memories
+        </span>
+      </div>
 
-            <p className="mt-7 max-w-2xl text-base leading-8 text-amoura-muted sm:text-lg">
-              AmoreFrame turns your camera into a premium romantic photobooth —
-              with guided countdowns, cinematic themes, instant photostrips, and
-              Dual Mode for shared memories from anywhere.
-            </p>
+      <h1 className="amoura-serif max-w-[650px] text-[3.3rem] leading-[0.98] tracking-[-0.03em] text-amoura-cream sm:text-[4rem] md:text-[4.5rem] lg:text-[4.4rem] xl:text-[5rem]">
+        Create romantic
+        <br />
+        photostrips{" "}
+        <span className="amoura-script text-amoura-red-soft">
+          together,
+        </span>
 
-            <div className="mt-9 flex flex-col gap-4 sm:flex-row">
-              <Link
-                href="/create-account"
-                className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-8 py-4 text-base font-semibold"
-              >
-                Create your first strip <ArrowRight className="h-5 w-5" />
-              </Link>
+        <span className="amoura-script block text-amoura-red-soft">
+          even from afar.
+        </span>
+      </h1>
 
-              <a
-                href="#dual-mode"
-                className="amoura-btn-secondary inline-flex items-center justify-center gap-2 rounded-full px-8 py-4 text-base font-semibold"
-              >
-                <Play className="h-5 w-5" /> See Dual Mode
-              </a>
-            </div>
+      <p className="mt-6 max-w-xl text-base leading-7 text-amoura-muted sm:text-lg sm:leading-8">
+        AmoreFrame turns your camera into a romantic virtual photobooth with
+        guided countdowns, cinematic themes, instant photostrips, and Dual
+        Mode for shared memories from anywhere.
+      </p>
 
-            <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 text-sm text-amoura-muted sm:grid-cols-3">
-              <TrustPill icon={Camera} text="Real booth flow" />
-              <TrustPill icon={Heart} text="Made for love" />
-              <TrustPill icon={ShieldCheck} text="No app store needed" />
-            </div>
-          </motion.div>
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+        <Link
+          href="/create-account"
+          className="amoura-btn-primary inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold sm:text-base"
+        >
+          Create your first strip
 
-          <HeroVisual />
-        </div>
-      </section>
+          <ArrowRight className="h-5 w-5" />
+        </Link>
+
+        <a
+          href="#dual-mode"
+          className="amoura-btn-secondary inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold sm:text-base"
+        >
+          <Play className="h-5 w-5" />
+          See Dual Mode
+        </a>
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-3 text-sm text-amoura-muted">
+        <TrustPill icon={Camera} text="Real booth flow" />
+        <TrustPill icon={Heart} text="Made for love" />
+        <TrustPill icon={ShieldCheck} text="No app needed" />
+      </div>
+    </motion.div>
+
+    <div className="relative flex items-center justify-center lg:justify-end">
+      <HeroVisual />
+    </div>
+  </div>
+</section>
 
       {/* Quick Value */}
       <section className="amoura-container py-10 sm:py-14">
